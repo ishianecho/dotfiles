@@ -23,6 +23,7 @@
 | `80-89` | Terminal applications |
 | `90-99` | Input support |
 | `g0-g9` | Gaming host libraries |
+| `m0-m9` | Mail |
 
 ## Windows
 
@@ -60,6 +61,7 @@ $env:SCOOP_DIR = "D:\Scoop"
 | `terminal` | POSIX `tmux`, `kitty`; Windows MSYS2 `tmux` and Windows Terminal |
 | `input` | Linux `fcitx5` with Chinese addons and Rime (`librime`, 白霜拼音); `breeze-cursor-theme` set as the default cursor (WSL only) |
 | `gaming` | Linux host libraries for Lutris, umu, and Proton: 32-bit and 64-bit Vulkan loaders, 32-bit ALSA/PulseAudio/OpenAL/Mesa, `gamemode`, `libayatana-appindicator` (also used by MaaEnd) |
+| `mail` | Linux/macOS `himalaya` (CLI email client) and `ortie` (OAuth token manager, AUR via paru or cargo fallback); Outlook XOAUTH2 configs managed under `~/.config/himalaya` and `~/.config/ortie`, authenticate with `ortie auth get -a outlook` |
 
 ## Targeted installation
 

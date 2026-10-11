@@ -1,0 +1,10 @@
+[accounts.outlook]
+default = true
+email = "ishio.liu@outlook.com"
+display-name = "ishio.liu"
+
+imap.server = "imaps://outlook.office365.com:993"
+imap.sasl.xoauth2.username = "ishio.liu@outlook.com"
+imap.sasl.xoauth2.token.command = ["ortie", "token", "show", "-a", "outlook"]
+
+mailbox.alias.inbox = "INBOX"

@@ -20,6 +20,7 @@ export DOTS_INSTALL_TERMINAL='{{ if hasKey . "installTerminal" }}{{ .installTerm
 export DOTS_INSTALL_COMPLETIONS='{{ if hasKey . "installCompletions" }}{{ .installCompletions }}{{ else }}true{{ end }}'
 export DOTS_INSTALL_INPUT='{{ if hasKey . "installInput" }}{{ .installInput }}{{ else }}false{{ end }}'
 export DOTS_INSTALL_GAMING='{{ if hasKey . "installGaming" }}{{ .installGaming }}{{ else }}true{{ end }}'
+export DOTS_INSTALL_MAIL='{{ if hasKey . "installMail" }}{{ .installMail }}{{ else }}true{{ end }}'
 {{- if eq .chezmoi.os "linux" }}
 if command -v sudo >/dev/null 2>&1 && ! sudo -n true >/dev/null 2>&1; then
   echo "sudo credentials required for package installation; run 'sudo -v' then re-run"
