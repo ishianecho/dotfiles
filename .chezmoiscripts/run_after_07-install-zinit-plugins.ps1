@@ -1,7 +1,6 @@
 $ErrorActionPreference = "Stop"
 
-$zplugInit = Join-Path $env:USERPROFILE ".local\share\zplug\init.zsh"
-if (-not (Test-Path -LiteralPath $zplugInit -PathType Leaf)) {
+if (-not (Test-Path -LiteralPath (Join-Path $env:USERPROFILE ".zshrc") -PathType Leaf)) {
     return
 }
 
@@ -17,13 +16,12 @@ if (-not (Test-Path -LiteralPath $msys2Zsh -PathType Leaf)) {
     return
 }
 
-$env:ZPLUG_AUTO_INSTALL = "1"
 $previousMSystem = $env:MSYSTEM
 $env:MSYSTEM = "MSYS"
 try {
     & $msys2Zsh -i -l -c 'exit'
     if ($LASTEXITCODE -ne 0) {
-        Write-Warning "zplug plugin installation failed"
+        Write-Warning "zinit plugin installation failed"
     }
 } finally {
     if ($null -eq $previousMSystem) {
@@ -31,5 +29,4 @@ try {
     } else {
         $env:MSYSTEM = $previousMSystem
     }
-    Remove-Item Env:\ZPLUG_AUTO_INSTALL -ErrorAction SilentlyContinue
 }

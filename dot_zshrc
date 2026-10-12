@@ -8,68 +8,61 @@ if [[ -n "${WT_SESSION:-}" ]]; then
     fi
     printf '\e]9;9;"%s"\e\\' "$wt_cwd"
   }
-  if (( ! ${precmd_functions[(Ie)__wt_report_cwd]} )); then
+  if ((! ${precmd_functions[(Ie)__wt_report_cwd]})); then
     precmd_functions+=(__wt_report_cwd)
   fi
 fi
 
-if [ ! -f "$XDG_DATA_HOME/zplug/init.zsh" ]; then
-  if command -v git >/dev/null 2>&1; then
-    mkdir -p "$(dirname "$XDG_DATA_HOME/zplug")"
-    git clone --depth 1 https://github.com/zplug/zplug "$XDG_DATA_HOME/zplug"
-  fi
+ZINIT_HOME="${XDG_DATA_HOME:-$HOME/.local/share}/zinit/zinit.git"
+if [ ! -d "$ZINIT_HOME" ]; then
+  mkdir -p "$(dirname "$ZINIT_HOME")"
+  git clone https://github.com/zdharma-continuum/zinit "$ZINIT_HOME"
 fi
-if [ ! -f "$XDG_DATA_HOME/zplug/init.zsh" ]; then
-  zplug() { return 0; }
-else
-  export ZPLUG_HOME="$XDG_DATA_HOME/zplug"
-  export PATH="$ZPLUG_HOME/bin:$PATH"
-  source "$ZPLUG_HOME/init.zsh"
-fi
+source "$ZINIT_HOME/zinit.zsh"
 
-ZSH_THEME="gozilla"
-zplug "ohmyzsh/ohmyzsh", use:"oh-my-zsh.sh", defer:0
+source "$XDG_CONFIG_HOME/zsh/opt.zsh"
 
-zplug "plugins/git",       from:oh-my-zsh, defer:1
-zplug "plugins/z",         from:oh-my-zsh, defer:1
-zplug "plugins/sudo",      from:oh-my-zsh, defer:1
-zplug "plugins/extract",   from:oh-my-zsh, defer:1
-zplug "plugins/fzf",       from:oh-my-zsh, defer:1
-zplug "plugins/gradle",    from:oh-my-zsh, ignore:"gradle.plugin.zsh", defer:1
+alias grep='grep --color=auto --exclude-dir={.bzr,CVS,.git,.hg,.svn,.idea,.tox,.venv,venv}'
+alias egrep='grep -E'
+alias fgrep='grep -F'
+
+fpath=("$XDG_CONFIG_HOME/zfunc" "$XDG_DATA_HOME/zsh/site-functions" $fpath)
+zstyle ':completion:*' menu select
+zstyle ':completion:*' matcher-list 'm:{a-zA-Z}={A-Za-z}'
+[[ -n "$LS_COLORS" ]] && zstyle ':completion:*' list-colors "${(s.:.)LS_COLORS}"
 
 VI_MODE_RESET_PROMPT_ON_MODE_CHANGE=true
 VI_MODE_SET_CURSOR=true
-zplug "plugins/vi-mode",   from:oh-my-zsh, defer:2
+zinit snippet OMZP::vi-mode
 
-zplug "zsh-users/zsh-syntax-highlighting", defer:2
+zinit light zsh-users/zsh-completions
+autoload -Uz compinit
+mkdir -p "$XDG_CACHE_HOME/zsh"
+compinit -d "$XDG_CACHE_HOME/zsh/zcompdump"
+zinit snippet OMZL::clipboard.zsh
+zinit snippet OMZL::directories.zsh
+zinit snippet OMZP::git
+zinit snippet OMZP::gradle
+zinit snippet OMZP::sudo
+zinit snippet OMZP::extract
+zinit snippet OMZP::z
+zinit light Aloxaf/fzf-tab
+zinit light zsh-users/zsh-autosuggestions
+zinit light hlissner/zsh-autopair
+zinit light zsh-users/zsh-syntax-highlighting
 
-zplug "zsh-users/zsh-autosuggestions", defer:2
-
-zplug "zsh-users/zsh-completions", defer:2
-zplug "Aloxaf/fzf-tab", defer:2
-
-
-if ! zplug check; then
-  if [ -n "${ZPLUG_AUTO_INSTALL:-}" ]; then
-    echo "Installing zplug plugins..."
-    zplug install
-  else
-    printf "Install? [y/N]: "
-    if read -q; then
-      echo; zplug install
-    fi
-  fi
-fi
-zplug load
-
+autoload -Uz vcs_info
+precmd_functions+=(vcs_info)
+zstyle ':vcs_info:git:*' formats '(%b) '
+PROMPT='%F{red}>>%f%B%F{red}>%f%b %B%F{cyan}%c%f%b %B%F{blue}${vcs_info_msg_0_}%f%b'
 
 [ -f "$XDG_CONFIG_HOME/fzf/fzf.zsh" ] && source "$XDG_CONFIG_HOME/fzf/fzf.zsh"
 source "$XDG_CONFIG_HOME/zsh/keybinds.zsh"
 source "$XDG_CONFIG_HOME/zsh/kitty.zsh"
 
 case ":$PATH:" in
-  *":$MISE_DATA_DIR/shims:"*) ;;
-  *) export PATH="$MISE_DATA_DIR/shims:$PATH" ;;
+*":$MISE_DATA_DIR/shims:"*) ;;
+*) export PATH="$MISE_DATA_DIR/shims:$PATH" ;;
 esac
 
 alias vi='nvim'

@@ -1,7 +1,7 @@
 {{- $im := "pinyin" -}}
 {{- if stat "/usr/share/rime-data/rime_frost_double_pinyin.schema.yaml" -}}
 {{-   $im = "rime" -}}
-{{- end }}
+{{- end -}}
 [Groups/0]
 # Group Name
 Name=Default
@@ -14,13 +14,14 @@ DefaultIM={{ $im }}
 # Name
 Name=keyboard-us
 # Layout
-Layout=
+# Layout=
 
 [Groups/0/Items/1]
 # Name
 Name={{ $im }}
 # Layout
-Layout=
+# Layout=
 
 [GroupOrder]
 0=Default
+
