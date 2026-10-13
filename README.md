@@ -115,6 +115,10 @@ Dots apply --scoop-prefix D:/Scoop
 
 See [`PACKAGES.md`](PACKAGES.md) for package groups and installer ordering.
 
+The `proxy`, `xrayctl`, `ghf`, and `updnvim` tools live in
+[ishianecho/bin](https://github.com/ishianecho/bin) and are installed into
+`~/.local/bin` via `.chezmoiexternal`.
+
 ## Notes
 
 - Use `.\Dots.cmd` on the first Windows run.
