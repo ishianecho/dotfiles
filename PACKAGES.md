@@ -58,7 +58,7 @@ $env:SCOOP_DIR = "D:\Scoop"
 | `operations` | `kubectl`, `netcat`, `openssh` (POSIX; Windows uses system OpenSSH); Arch-based Linux additionally installs `paru` (AUR helper) and `xray-bin`; Windows additionally installs `xray` and `nssm` (Xray service wrapper) |
 | `ai` | `cc-switch`, `codex`, `claude`, `serena`, `github-mcp-server`, `codegraph`; Windows additionally installs the MSYS2 bundle |
 | `terminal` | POSIX `tmux`, `kitty`; Windows MSYS2 `tmux` and Windows Terminal |
-| `input` | Linux `fcitx5` with Chinese addons and Rime (`librime`, 白霜拼音); `breeze-cursor-theme` set as the default cursor (WSL only) |
+| `input` | Linux `fcitx5` with Chinese addons and Rime (`librime`, 白霜拼音); `breeze-cursor-theme` set as the default cursor (Linux) |
 | `gaming` | Linux host libraries for Lutris, umu, and Proton: 32-bit and 64-bit Vulkan loaders, 32-bit ALSA/PulseAudio/OpenAL/Mesa, `gamemode`, `libayatana-appindicator` (also used by MaaEnd) |
 
 ## Targeted installation

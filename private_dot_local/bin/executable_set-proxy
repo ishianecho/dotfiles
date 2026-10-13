@@ -186,6 +186,12 @@ case "$mode" in
       usage >&2
       exit 2
     }
+    if [ -r "$config_file" ]; then
+      . "$config_file"
+      [ -n "$http" ] || http="${PROXY_HTTP:-}"
+      [ -n "$socks" ] || socks="${PROXY_SOCKS:-}"
+      [ -n "$no_proxy" ] || no_proxy="${PROXY_NO_PROXY:-}"
+    fi
     validate_url "$http" HTTP_PROXY
     validate_url "$socks" SOCKS_PROXY
     [ -n "$no_proxy" ] || no_proxy="localhost,127.0.0.1,::1"

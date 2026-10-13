@@ -3,8 +3,7 @@
 pkg_name="breeze-cursor-theme"
 
 install_breeze_cursor() {
-  if [ "$is_wsl" != "true" ]; then
-    echo "Skipping breeze-cursor-theme: only supported on WSL"
+  if [ "$os" != "linux" ]; then
     return 0
   fi
 

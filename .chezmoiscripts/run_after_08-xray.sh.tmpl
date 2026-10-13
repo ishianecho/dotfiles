@@ -86,16 +86,29 @@ printf 'TPROXY_PORT=%s\n' "$tproxy_port" | sudo tee "$tproxy_dir/tproxy.env" >/d
 tproxy_tmp="$(mktemp)"
 cat >"$tproxy_tmp" <<'EOF'
 #!/bin/sh
+XRAY_STATE_FILE="{{ .chezmoi.homeDir }}/.config/xray/state.json"
 TPROXY_PORT=10800
 [ -r /usr/local/etc/xray/tproxy.env ] && . /usr/local/etc/xray/tproxy.env
+if command -v jq >/dev/null 2>&1 && [ -r "$XRAY_STATE_FILE" ]; then
+  state_port="$(jq -r '.ports.tproxy // empty' "$XRAY_STATE_FILE" 2>/dev/null)"
+  if [ -n "$state_port" ]; then
+    TPROXY_PORT="$state_port"
+  fi
+fi
 
 tproxy_stop() {
   while ip rule del fwmark 1 table 100 2>/dev/null; do :; done
   ip route flush table 100 2>/dev/null
+  iptables -t mangle -D PREROUTING -i waydroid0 -j XRAY_WD 2>/dev/null
+  iptables -D INPUT -m mark --mark 1 -j ACCEPT 2>/dev/null
   iptables -t mangle -D PREROUTING -j XRAY 2>/dev/null
-  iptables -t mangle -D OUTPUT -j XRAY_MASK 2>/dev/null
+  iptables -t mangle -D OUTPUT -m owner ! --gid-owner 23333 -j XRAY_MASK 2>/dev/null
+  iptables -t mangle -F XRAY_WD 2>/dev/null
+  iptables -t mangle -X XRAY_WD 2>/dev/null
   iptables -t mangle -F XRAY 2>/dev/null
   iptables -t mangle -X XRAY 2>/dev/null
+  iptables -t mangle -F XRAY_EX 2>/dev/null
+  iptables -t mangle -X XRAY_EX 2>/dev/null
   iptables -t mangle -F XRAY_MASK 2>/dev/null
   iptables -t mangle -X XRAY_MASK 2>/dev/null
   iptables -t nat -D PREROUTING -j XRAY_DNS 2>/dev/null
@@ -105,48 +118,72 @@ tproxy_stop() {
 }
 
 tproxy_start() {
+  [ -w /proc/sys/net/bridge/bridge-nf-call-iptables ] && echo 0 > /proc/sys/net/bridge/bridge-nf-call-iptables
   ip rule add fwmark 1 table 100
   ip route add local 0.0.0.0/0 dev lo table 100
 
-  lan_dev="$(ip route show default 2>/dev/null | awk '{for (i = 1; i < NF; i++) if ($i == "dev") {print $(i + 1); exit}}')"
-
-  iptables -t mangle -N XRAY
-  iptables -t mangle -A XRAY -i waydroid0 -j RETURN
+  iptables -t mangle -N XRAY 2>/dev/null || iptables -t mangle -F XRAY
+  iptables -t mangle -A XRAY -m physdev --physdev-is-bridged -j RETURN
   iptables -t mangle -A XRAY -d 127.0.0.0/8 -j RETURN
+  iptables -t mangle -A XRAY -d 10.0.0.0/8 -j RETURN
+  iptables -t mangle -A XRAY -d 172.16.0.0/12 -j RETURN
+  iptables -t mangle -A XRAY -d 192.168.0.0/16 -j RETURN
+  iptables -t mangle -A XRAY -d 169.254.0.0/16 -j RETURN
+  iptables -t mangle -A XRAY -d 100.64.0.0/10 -j RETURN
+  iptables -t mangle -A XRAY -d 192.0.0.0/24 -j RETURN
+  iptables -t mangle -A XRAY -d 192.0.2.0/24 -j RETURN
+  iptables -t mangle -A XRAY -d 198.18.0.0/15 -j RETURN
+  iptables -t mangle -A XRAY -d 198.51.100.0/24 -j RETURN
+  iptables -t mangle -A XRAY -d 203.0.113.0/24 -j RETURN
   iptables -t mangle -A XRAY -d 224.0.0.0/4 -j RETURN
-  iptables -t mangle -A XRAY -d 255.255.255.255/32 -j RETURN
-  if [ -n "$lan_dev" ]; then
-    for lan_subnet in $(ip -o -4 addr show dev "$lan_dev" scope global 2>/dev/null | awk '{print $4}'); do
-      iptables -t mangle -A XRAY -d "$lan_subnet" -j RETURN
-    done
-  fi
-  iptables -t mangle -A XRAY -p tcp --dport 53 -j RETURN
+  iptables -t mangle -A XRAY -d 240.0.0.0/4 -j RETURN
   iptables -t mangle -A XRAY -p udp --dport 53 -j RETURN
+  iptables -t mangle -A XRAY -p tcp --dport 53 -j RETURN
   iptables -t mangle -A XRAY -j RETURN -m mark --mark 0xff
   iptables -t mangle -A XRAY -p tcp -j TPROXY --on-ip 127.0.0.1 --on-port "$TPROXY_PORT" --tproxy-mark 1
   iptables -t mangle -A XRAY -p udp -j TPROXY --on-ip 127.0.0.1 --on-port "$TPROXY_PORT" --tproxy-mark 1
+
+  iptables -t mangle -N XRAY_WD 2>/dev/null || iptables -t mangle -F XRAY_WD
+  iptables -t mangle -A XRAY_WD -m physdev --physdev-is-bridged -j RETURN
+  iptables -t mangle -A XRAY_WD -d 127.0.0.0/8 -j RETURN
+  iptables -t mangle -A XRAY_WD -d 10.0.0.0/8 -j RETURN
+  iptables -t mangle -A XRAY_WD -d 172.16.0.0/12 -j RETURN
+  iptables -t mangle -A XRAY_WD -d 192.168.0.0/16 -j RETURN
+  iptables -t mangle -A XRAY_WD -d 169.254.0.0/16 -j RETURN
+  iptables -t mangle -A XRAY_WD -d 100.64.0.0/10 -j RETURN
+  iptables -t mangle -A XRAY_WD -d 192.0.0.0/24 -j RETURN
+  iptables -t mangle -A XRAY_WD -d 192.0.2.0/24 -j RETURN
+  iptables -t mangle -A XRAY_WD -d 198.18.0.0/15 -j RETURN
+  iptables -t mangle -A XRAY_WD -d 198.51.100.0/24 -j RETURN
+  iptables -t mangle -A XRAY_WD -d 203.0.113.0/24 -j RETURN
+  iptables -t mangle -A XRAY_WD -d 224.0.0.0/4 -j RETURN
+  iptables -t mangle -A XRAY_WD -d 240.0.0.0/4 -j RETURN
+  iptables -t mangle -A XRAY_WD -p udp --dport 53 -j RETURN
+  iptables -t mangle -A XRAY_WD -p tcp --dport 53 -j RETURN
+  iptables -t mangle -A XRAY_WD -j RETURN -m mark --mark 0xff
+  iptables -t mangle -A XRAY_WD -p tcp -j TPROXY --on-ip 127.0.0.1 --on-port "$TPROXY_PORT" --tproxy-mark 1
+  iptables -t mangle -A XRAY_WD -p udp -j TPROXY --on-ip 127.0.0.1 --on-port "$TPROXY_PORT" --tproxy-mark 1
+
+  iptables -t mangle -A PREROUTING -i waydroid0 -j XRAY_WD
   iptables -t mangle -A PREROUTING -j XRAY
 
-  iptables -t mangle -N XRAY_MASK
+  iptables -C INPUT -m mark --mark 1 -j ACCEPT 2>/dev/null || iptables -I INPUT 1 -m mark --mark 1 -j ACCEPT
+
+  iptables -t mangle -N XRAY_MASK 2>/dev/null || iptables -t mangle -F XRAY_MASK
   iptables -t mangle -A XRAY_MASK -d 127.0.0.0/8 -j RETURN
+  iptables -t mangle -A XRAY_MASK -d 10.0.0.0/8 -j RETURN
+  iptables -t mangle -A XRAY_MASK -d 172.16.0.0/12 -j RETURN
+  iptables -t mangle -A XRAY_MASK -d 192.168.0.0/16 -j RETURN
+  iptables -t mangle -A XRAY_MASK -d 169.254.0.0/16 -j RETURN
+  iptables -t mangle -A XRAY_MASK -d 100.64.0.0/10 -j RETURN
   iptables -t mangle -A XRAY_MASK -d 224.0.0.0/4 -j RETURN
-  iptables -t mangle -A XRAY_MASK -d 255.255.255.255/32 -j RETURN
-  if [ -n "$lan_dev" ]; then
-    for lan_subnet in $(ip -o -4 addr show dev "$lan_dev" scope global 2>/dev/null | awk '{print $4}'); do
-      iptables -t mangle -A XRAY_MASK -d "$lan_subnet" -j RETURN
-    done
-  fi
-  iptables -t mangle -A XRAY_MASK -p tcp --dport 53 -j RETURN
+  iptables -t mangle -A XRAY_MASK -d 240.0.0.0/4 -j RETURN
   iptables -t mangle -A XRAY_MASK -p udp --dport 53 -j RETURN
+  iptables -t mangle -A XRAY_MASK -p tcp --dport 53 -j RETURN
   iptables -t mangle -A XRAY_MASK -j RETURN -m mark --mark 0xff
   iptables -t mangle -A XRAY_MASK -p tcp -j MARK --set-mark 1
   iptables -t mangle -A XRAY_MASK -p udp -j MARK --set-mark 1
   iptables -t mangle -A OUTPUT -m owner ! --gid-owner 23333 -j XRAY_MASK
-
-  iptables -t nat -N XRAY_DNS
-  iptables -t nat -A XRAY_DNS -i waydroid0 -p udp --dport 53 -j DNAT --to-destination 223.5.5.5:53
-  iptables -t nat -A XRAY_DNS -i waydroid0 -p tcp --dport 53 -j DNAT --to-destination 223.5.5.5:53
-  iptables -t nat -A PREROUTING -j XRAY_DNS
   return 0
 }
 

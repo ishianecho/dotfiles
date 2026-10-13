@@ -583,6 +583,13 @@ write_tproxy_env() {
   printf 'TPROXY_PORT=%s\n' "$1" | sudo tee "$tproxy_env_file" >/dev/null
 }
 
+sync_proxy_env() {
+  local socks_port
+  socks_port="$(state_query '.ports.socks')"
+  command -v set-proxy >/dev/null 2>&1 || return 0
+  set-proxy --http "http://127.0.0.1:$socks_port" --socks "socks5://127.0.0.1:$socks_port"
+}
+
 port_set() {
   load_state
   local socks="" tproxy="" current_socks current_tproxy
@@ -613,6 +620,9 @@ port_set() {
   fi
   printf 'Ports: socks=%s tproxy=%s\n' "$socks" "$tproxy"
   regen
+  if [ "$socks" != "$current_socks" ]; then
+    sync_proxy_env
+  fi
 }
 
 cmd_port() {

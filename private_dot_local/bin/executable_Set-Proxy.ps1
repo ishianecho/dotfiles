@@ -184,6 +184,18 @@ if ($Clear) {
     $values = Read-ProxyConfiguration -Path $configPath
     Set-ManagedEnvironment -Values $values
 } else {
+    if (Test-Path -LiteralPath $configPath -PathType Leaf) {
+        $existing = Read-ProxyConfiguration -Path $configPath
+        if (-not $Http) {
+            $Http = $existing.Http
+        }
+        if (-not $Socks) {
+            $Socks = $existing.Socks
+        }
+        if (-not $NoProxy) {
+            $NoProxy = $existing.NoProxy
+        }
+    }
     Assert-ProxyUrl -Value $Http -Kind HTTP_PROXY
     Assert-ProxyUrl -Value $Socks -Kind SOCKS_PROXY
     if (-not $NoProxy) {

@@ -337,6 +337,18 @@ function New-XrayConfig {
                     allowTransparent = $false
                 }
             }
+            [ordered]@{
+                tag      = "tun"
+                protocol = "tun"
+                settings = [ordered]@{
+                    name                     = "XrayTun"
+                    desc                     = "Xray"
+                    gateway                  = @("172.19.0.1/30")
+                    dns                      = @("223.5.5.5", "1.1.1.1")
+                    autoSystemRoutingTable   = @("0.0.0.0/0")
+                    autoOutboundsInterface   = "auto"
+                }
+            }
         )
         outbounds = @(
             [ordered]@{
@@ -691,6 +703,7 @@ function Invoke-Port {
         throw "port set requires --socks or --tproxy"
     }
     $state = Get-State
+    $currentSocks = [string]$state.ports.socks
     if (-not $socks) {
         $socks = [string]$state.ports.socks
     }
@@ -709,6 +722,12 @@ function Invoke-Port {
     Save-State $state
     Write-Host "Ports: socks=$socks tproxy=$tproxy"
     Invoke-Rebuild $state
+    if ($socks -ne $currentSocks) {
+        $setProxy = Join-Path $PSScriptRoot "Set-Proxy.ps1"
+        if (Test-Path -LiteralPath $setProxy -PathType Leaf) {
+            & $setProxy -Http "http://127.0.0.1:$socks" -Socks "socks5://127.0.0.1:$socks"
+        }
+    }
 }
 
 function Invoke-Status {
