@@ -31,7 +31,7 @@
 - Custom Scoop root:
 
 ```powershell
-Dots apply --scoop-prefix D:/Scoop
+dots apply --scoop-prefix D:/Scoop
 ```
 
 or:
@@ -71,10 +71,10 @@ dots install codegraph
 ```
 
 ```powershell
-Dots install shell
-Dots install build
-Dots install ai
-Dots install codegraph
+dots install shell
+dots install build
+dots install ai
+dots install codegraph
 ```
 
 ## Notes

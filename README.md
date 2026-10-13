@@ -97,11 +97,11 @@ dots install <target>
 Windows:
 
 ```powershell
-.\Dots.cmd init
-Dots update
-Dots update --init
-Dots install <target>
-Dots apply --scoop-prefix D:/Scoop
+.\dots.cmd init
+dots update
+dots update --init
+dots install <target>
+dots apply --scoop-prefix D:/Scoop
 ```
 
 ## Features
@@ -121,7 +121,7 @@ The `proxy`, `xrayctl`, `ghf`, and `updnvim` tools live in
 
 ## Notes
 
-- Use `.\Dots.cmd` on the first Windows run.
+- Use `.\dots.cmd` on the first Windows run.
 - Configure a proxy with `proxy set` before the first apply when needed.
 - The Windows shell is Zsh inside MSYS2 when MSYS2 and Zsh are installed.
 - WSL uses mirrored networking.

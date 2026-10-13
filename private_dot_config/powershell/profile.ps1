@@ -390,10 +390,10 @@ $dotsCompleter = {
     $targets |
         Where-Object { $_.StartsWith($wordToComplete, [StringComparison]::OrdinalIgnoreCase) } |
         ForEach-Object {
-            [System.Management.Automation.CompletionResult]::new($_, $_, "ParameterValue", "Dots install $_")
+            [System.Management.Automation.CompletionResult]::new($_, $_, "ParameterValue", "dots install $_")
         }
 }
-Register-ArgumentCompleter -Native -CommandName Dots,dots -ScriptBlock $dotsCompleter
+Register-ArgumentCompleter -Native -CommandName dots -ScriptBlock $dotsCompleter
 
 Set-Alias -Name vi -Value nvim
 Set-Alias -Name vim -Value nvim

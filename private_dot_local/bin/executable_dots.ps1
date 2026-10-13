@@ -4,7 +4,7 @@ $ErrorActionPreference = "Stop"
 
 function Show-Usage {
     @'
-Usage: Dots <command> [args]
+Usage: dots <command> [args]
 
 Commands:
   init                Reinitialize chezmoi, reset script state, and apply
@@ -29,11 +29,11 @@ Install groups:
   shell, build, runtimes, editor, tools, operations, ai, terminal, all
 
 Examples:
-  Dots init
-  Dots init --proxy http://127.0.0.1:10808 --socks socks5://127.0.0.1:10808
-  Dots apply --scoop-prefix D:/Scoop
-  Dots install dev
-  Dots proxy http://127.0.0.1:10808 socks5://127.0.0.1:10808
+  dots init
+  dots init --proxy http://127.0.0.1:10808 --socks socks5://127.0.0.1:10808
+  dots apply --scoop-prefix D:/Scoop
+  dots install dev
+  dots proxy http://127.0.0.1:10808 socks5://127.0.0.1:10808
 '@ | Write-Host
 }
 
@@ -294,7 +294,7 @@ switch ($command) {
     }
     "install" {
         if ($rest.Count -eq 0) {
-            Write-Error "Dots install requires a package or group name"
+            Write-Error "dots install requires a package or group name"
             exit 2
         }
         $target = $rest[0]
