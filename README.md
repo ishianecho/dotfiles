@@ -118,7 +118,7 @@ See [`PACKAGES.md`](PACKAGES.md) for package groups and installer ordering.
 ## Notes
 
 - Use `.\Dots.cmd` on the first Windows run.
-- Configure a proxy with `set-proxy` before the first apply when needed.
+- Configure a proxy with `proxy set` before the first apply when needed.
 - The Windows shell is Zsh inside MSYS2 when MSYS2 and Zsh are installed.
 - WSL uses mirrored networking.
 - Do not commit credentials in `~/.config/env` or `~/.config/env.local.ps1`.

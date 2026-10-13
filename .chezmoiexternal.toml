@@ -1,0 +1,24 @@
+{{ if eq .chezmoi.os "windows" }}
+[".local/bin/proxy.ps1"]
+    type = "file"
+    url = "https://raw.githubusercontent.com/ishianecho/bin/main/win/proxy.ps1"
+[".local/bin/updnvim.ps1"]
+    type = "file"
+    url = "https://raw.githubusercontent.com/ishianecho/bin/main/win/updnvim.ps1"
+{{ end }}
+[".local/bin/ghf"]
+    type = "file"
+    url = "https://raw.githubusercontent.com/ishianecho/bin/main/posix/ghf"
+    executable = true
+[".local/bin/proxy"]
+    type = "file"
+    url = "https://raw.githubusercontent.com/ishianecho/bin/main/posix/proxy"
+    executable = true
+[".local/bin/updnvim"]
+    type = "file"
+    url = "https://raw.githubusercontent.com/ishianecho/bin/main/posix/updnvim"
+    executable = true
+[".local/bin/completion.sh"]
+    type = "file"
+    url = "https://raw.githubusercontent.com/ishianecho/bin/main/posix/completion.sh"
+    executable = true

@@ -3,5 +3,5 @@ Host github.com
   User git
   Port 22
 {{- if ne .chezmoi.os "windows" }}
-  ProxyCommand sh -c 'exec "$HOME/.local/bin/proxy-ssh" %h %p'
+  ProxyCommand sh -c 'exec "$HOME/.local/bin/proxy" ssh %h %p'
 {{- end }}

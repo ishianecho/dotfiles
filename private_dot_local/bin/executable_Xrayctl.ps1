@@ -723,9 +723,9 @@ function Invoke-Port {
     Write-Host "Ports: socks=$socks tproxy=$tproxy"
     Invoke-Rebuild $state
     if ($socks -ne $currentSocks) {
-        $setProxy = Join-Path $PSScriptRoot "Set-Proxy.ps1"
-        if (Test-Path -LiteralPath $setProxy -PathType Leaf) {
-            & $setProxy -Http "http://127.0.0.1:$socks" -Socks "socks5://127.0.0.1:$socks"
+        $proxy = Join-Path $env:USERPROFILE ".local\bin\proxy.ps1"
+        if (Test-Path -LiteralPath $proxy -PathType Leaf) {
+            & $proxy set -Http "http://127.0.0.1:$socks" -Socks "socks5://127.0.0.1:$socks"
         }
     }
 }

@@ -16,7 +16,7 @@ Commands:
   update --init       Pull, reinitialize, reset script state, and apply
   doctor              Run chezmoi doctor
   install <target>    Install a package or a curated group
-  proxy [args]        Run Set-Proxy.ps1
+  proxy [args]        Run proxy set
 
 Options (accepted by non-proxy commands):
   --scoop-prefix <dir>   Install Scoop under <dir>
@@ -68,22 +68,12 @@ function Initialize-Dots {
 }
 
 function Get-ProxyScript {
-    $localScript = Join-Path $PSScriptRoot "Set-Proxy.ps1"
+    $localScript = Join-Path $PSScriptRoot "proxy.ps1"
     if (Test-Path -LiteralPath $localScript -PathType Leaf) {
         return $localScript
     }
 
-    $sourceScript = Join-Path $PSScriptRoot "executable_Set-Proxy.ps1"
-    if (Test-Path -LiteralPath $sourceScript -PathType Leaf) {
-        return $sourceScript
-    }
-
-    $rootScript = Join-Path $PSScriptRoot "..\..\Set-Proxy.cmd"
-    if (Test-Path -LiteralPath $rootScript -PathType Leaf) {
-        return (Resolve-Path -LiteralPath $rootScript).Path
-    }
-
-    Write-Error "Set-Proxy.ps1 was not found"
+    Write-Error "proxy.ps1 was not found"
     exit 1
 }
 
@@ -158,7 +148,7 @@ if ($args.Count -gt 0 -and $args[0] -eq "proxy") {
     } else {
         @() 
     }
-    & (Get-ProxyScript) @proxyRest
+    & (Get-ProxyScript) set @proxyRest
     if (-not $?) {
         exit 1
     }
@@ -222,25 +212,29 @@ if ($scoopPrefix) {
     $env:SCOOP_DIR = $scoopPrefix 
 }
 
-$proxyParameters = @{}
+$proxyParameters = @()
 if ($proxyHttp) {
-    $proxyParameters.Http = $proxyHttp 
+    $proxyParameters += @("-Http", $proxyHttp)
 }
 if ($proxySocks) {
-    $proxyParameters.Socks = $proxySocks 
+    $proxyParameters += @("-Socks", $proxySocks)
 }
 if ($proxyNoProxy) {
-    $proxyParameters.NoProxy = $proxyNoProxy 
+    $proxyParameters += @("-NoProxy", $proxyNoProxy)
 }
 if ($proxyClear) {
     if ($proxyParameters.Count -gt 0) {
         Write-Error "--clear-proxy cannot be combined with other proxy options"
         exit 2
     }
-    $proxyParameters.Clear = $true
 }
-if ($proxyParameters.Count -gt 0) {
-    & (Get-ProxyScript) @proxyParameters
+if ($proxyClear) {
+    & (Get-ProxyScript) clear
+    if (-not $?) {
+        exit 1
+    }
+} elseif ($proxyParameters.Count -gt 0) {
+    & (Get-ProxyScript) set @proxyParameters
     if (-not $?) {
         exit 1
     }
@@ -293,7 +287,7 @@ switch ($command) {
         chezmoi doctor @rest
     }
     "proxy" {
-        & (Get-ProxyScript) @rest
+        & (Get-ProxyScript) set @rest
         if (-not $?) {
             exit 1
         }

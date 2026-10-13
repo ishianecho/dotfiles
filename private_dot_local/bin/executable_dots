@@ -18,7 +18,7 @@ Commands:
   update --init       Pull, reinitialize, reset script state, and apply
   doctor              Run chezmoi doctor
   install <target>    Install a package or a curated group
-  proxy [args]        Run set-proxy
+  proxy [args]        Run proxy set
 
 Options (accepted by non-proxy commands):
   --proxy <url>       Set the HTTP/HTTPS proxy before running the command
@@ -111,9 +111,7 @@ init_dots() {
 }
 
 proxy_script_path() {
-  local proxy_script="$script_dir/set-proxy"
-  [ -x "$proxy_script" ] || proxy_script="$HOME/.local/bin/set-proxy"
-  printf '%s\n' "$proxy_script"
+  printf '%s\n' "$HOME/.local/bin/proxy"
 }
 
 load_proxy_environment() {
@@ -206,7 +204,7 @@ install_group() {
 
 if [ "${1:-}" = proxy ]; then
   shift
-  exec "$(proxy_script_path)" "$@"
+  exec "$(proxy_script_path)" set "$@"
 fi
 
 trap 'restore_on_exit' EXIT
@@ -264,11 +262,10 @@ if [ "$proxy_clear" = true ]; then
     echo "--clear-proxy cannot be combined with other proxy options" >&2
     exit 2
   }
-  proxy_args=(--clear)
-fi
-
-if [ "${#proxy_args[@]}" -gt 0 ]; then
-  "$(proxy_script_path)" "${proxy_args[@]}"
+  "$(proxy_script_path)" clear
+  load_proxy_environment
+elif [ "${#proxy_args[@]}" -gt 0 ]; then
+  "$(proxy_script_path)" set "${proxy_args[@]}"
   load_proxy_environment
 fi
 
@@ -329,7 +326,7 @@ case "${1:-help}" in
     ;;
   proxy)
     shift
-    exec "$(proxy_script_path)" "$@"
+    exec "$(proxy_script_path)" set "$@"
     ;;
   install)
     shift

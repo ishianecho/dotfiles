@@ -584,10 +584,10 @@ write_tproxy_env() {
 }
 
 sync_proxy_env() {
-  local socks_port
+  local socks_port proxy_bin="$HOME/.local/bin/proxy"
   socks_port="$(state_query '.ports.socks')"
-  command -v set-proxy >/dev/null 2>&1 || return 0
-  set-proxy --http "http://127.0.0.1:$socks_port" --socks "socks5://127.0.0.1:$socks_port"
+  [ -x "$proxy_bin" ] || return 0
+  "$proxy_bin" set --http "http://127.0.0.1:$socks_port" --socks "socks5://127.0.0.1:$socks_port"
 }
 
 port_set() {
