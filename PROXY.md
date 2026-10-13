@@ -5,9 +5,9 @@ environment variables only: `HTTP_PROXY`, `HTTPS_PROXY`, `ALL_PROXY`,
 `NO_PROXY`. No per-tool configuration is written. SSH uses the managed
 `proxy ssh` helper.
 
-The `proxy` command lives in [ishianecho/bin](https://github.com/ishianecho/bin)
-and is installed into `~/.local/bin` through `.chezmoiexternal`, tracking the
-repository's main branch.
+The `proxy` command is a Go binary from
+[ishianecho/bin](https://github.com/ishianecho/bin), installed into
+`~/.local/bin` through `.chezmoiexternal` from the latest release.
 
 ## Commands
 
@@ -20,17 +20,16 @@ proxy sync
 proxy clear
 ```
 
-Windows: `proxy.cmd` (or `proxy.ps1`) with the same subcommands; `set`
-accepts `-Http`, `-Socks`, `-NoProxy` in addition to the positional URLs.
+Windows: `proxy.exe` with the same subcommands.
 
 Passing only `--http` (or only `--socks`) to `proxy set` merges with the
 saved configuration; `proxy clear` removes everything.
 
 Before the first apply, run `proxy` from a checkout of
 [ishianecho/bin](https://github.com/ishianecho/bin) (for example
-`~/src/bin/posix/proxy set ...`); the binary itself is only installed into
-`~/.local/bin` during the apply. The `dots`/`Dots` entrypoints also accept
-proxy arguments:
+`cd ~/src/bin && go run ./cmd/proxy set ...`); the binary itself is only
+installed into `~/.local/bin` during the apply. The `dots`/`Dots`
+entrypoints also accept proxy arguments:
 
 ```sh
 dots proxy http://127.0.0.1:10808 socks5://127.0.0.1:10808

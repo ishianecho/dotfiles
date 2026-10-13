@@ -1,10 +1,10 @@
 # Xray
 
-Xray is managed by `xrayctl` (Linux) and `xrayctl.cmd` (Windows). State
+Xray is managed by `xrayctl` (a Go binary, `xrayctl.exe` on Windows). State
 lives in `~/.config/xray/state.json`; `~/.config/xray/config.json` is
 generated output — do not edit it by hand. The `xrayctl` command lives in
 [ishianecho/bin](https://github.com/ishianecho/bin) and is installed into
-`~/.local/bin` through `.chezmoiexternal`.
+`~/.local/bin` through `.chezmoiexternal` from the latest release.
 
 ## Commands
 
@@ -57,7 +57,7 @@ re-login required; `sudo -g xray_tproxy <cmd>` works before re-login).
 
 ## Windows
 
-Same commands via `Xrayctl.cmd`; `--tproxy` has no effect. The generated
+Same commands via `xrayctl.exe`; `--tproxy` has no effect. The generated
 config includes a `tun` inbound (wintun adapter `XrayTun`) that captures
 all traffic system-wide; the socks mixed inbound stays available. Requires
 `wintun.dll` next to `xray.exe`. The NSSM service needs an elevated

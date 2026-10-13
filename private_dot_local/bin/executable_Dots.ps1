@@ -68,12 +68,12 @@ function Initialize-Dots {
 }
 
 function Get-ProxyScript {
-    $localScript = Join-Path $PSScriptRoot "proxy.ps1"
+    $localScript = Join-Path $PSScriptRoot "proxy.exe"
     if (Test-Path -LiteralPath $localScript -PathType Leaf) {
         return $localScript
     }
 
-    Write-Error "proxy.ps1 was not found"
+    Write-Error "proxy.exe was not found"
     exit 1
 }
 
@@ -214,13 +214,13 @@ if ($scoopPrefix) {
 
 $proxyParameters = @()
 if ($proxyHttp) {
-    $proxyParameters += @("-Http", $proxyHttp)
+    $proxyParameters += @("--http", $proxyHttp)
 }
 if ($proxySocks) {
-    $proxyParameters += @("-Socks", $proxySocks)
+    $proxyParameters += @("--socks", $proxySocks)
 }
 if ($proxyNoProxy) {
-    $proxyParameters += @("-NoProxy", $proxyNoProxy)
+    $proxyParameters += @("--no-proxy", $proxyNoProxy)
 }
 if ($proxyClear) {
     if ($proxyParameters.Count -gt 0) {

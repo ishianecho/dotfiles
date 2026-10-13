@@ -6,9 +6,9 @@ if (-not (Test-Path -LiteralPath $configPath -PathType Leaf)) {
     exit 0
 }
 
-$proxy = Join-Path $env:USERPROFILE ".local\bin\proxy.ps1"
+$proxy = Join-Path $env:USERPROFILE ".local\bin\proxy.exe"
 if (-not (Test-Path -LiteralPath $proxy -PathType Leaf)) {
-    Write-Warning "proxy.ps1 is not installed; skipping proxy synchronization."
+    Write-Warning "proxy.exe is not installed; skipping proxy synchronization."
     exit 0
 }
 
