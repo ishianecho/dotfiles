@@ -1,8 +1,10 @@
 # Xray
 
-Xray is managed by `xrayctl` (Linux) and `Xrayctl.cmd` (Windows). State
+Xray is managed by `xrayctl` (Linux) and `xrayctl.cmd` (Windows). State
 lives in `~/.config/xray/state.json`; `~/.config/xray/config.json` is
-generated output — do not edit it by hand.
+generated output — do not edit it by hand. The `xrayctl` command lives in
+[ishianecho/bin](https://github.com/ishianecho/bin) and is installed into
+`~/.local/bin` through `.chezmoiexternal`.
 
 ## Commands
 
