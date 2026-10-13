@@ -2,6 +2,14 @@
 
 set -euo pipefail
 
+if ! grep -qw xray_tproxy /etc/group; then
+  sudo groupadd -g 23333 xray_tproxy
+fi
+if ! id -nG "$(id -un)" | grep -qw xray_tproxy; then
+  sudo usermod -aG xray_tproxy "$(id -un)"
+  echo "Added $(id -un) to xray_tproxy; re-login required for 'sg xray_tproxy' and 'xrayctl direct'"
+fi
+
 xray_bin="$(command -v xray || true)"
 if [ -z "$xray_bin" ]; then
   echo "xray not found; skipping Xray service setup"
@@ -9,15 +17,22 @@ if [ -z "$xray_bin" ]; then
 fi
 
 xray_config="{{ .chezmoi.homeDir }}/.config/xray/config.json"
-if [ ! -f "$xray_config" ]; then
-  echo "Xray config not found at $xray_config; skipping Xray service setup"
+xray_state="{{ .chezmoi.homeDir }}/.config/xray/state.json"
+xray_env="{{ .chezmoi.homeDir }}/.config/xray/env"
+
+if [ ! -f "$xray_state" ] && [ -f "$xray_env" ] && command -v xrayctl >/dev/null 2>&1 && command -v jq >/dev/null 2>&1; then
+  xrayctl init
+fi
+if [ ! -f "$xray_state" ]; then
+  echo "Xray state not found at $xray_state"
+  echo "Run 'xrayctl init' or 'xrayctl node add <tag> vless://...'; skipping Xray service setup"
   exit 0
 fi
-
-xray_env="{{ .chezmoi.homeDir }}/.config/xray/env"
-if [ ! -f "$xray_env" ]; then
-  echo "Xray credentials not found at $xray_env; skipping Xray service setup"
-  echo "Create it with KEY=value lines: XRAY_TAG XRAY_ADDRESS XRAY_PORT XRAY_UUID XRAY_SNI XRAY_PUBLIC_KEY XRAY_SHORT_ID"
+if [ ! -f "$xray_config" ] && command -v xrayctl >/dev/null 2>&1; then
+  xrayctl init
+fi
+if [ ! -f "$xray_config" ]; then
+  echo "Xray config not found at $xray_config; skipping Xray service setup"
   exit 0
 fi
 
@@ -27,7 +42,7 @@ if ! command -v systemctl >/dev/null 2>&1; then
 fi
 
 if ! command -v sudo >/dev/null 2>&1; then
-  echo "sudo not available; skipping Xray service setup"
+  echo "sudo not found; skipping Xray service setup"
   exit 0
 fi
 
@@ -62,9 +77,18 @@ tproxy_line=""
 tproxy_dir="/usr/local/etc/xray"
 sudo mkdir -p "$tproxy_dir"
 
+tproxy_port="10800"
+if command -v jq >/dev/null 2>&1; then
+  tproxy_port="$(jq -r '.ports.tproxy // 10800' "$xray_state")"
+fi
+printf 'TPROXY_PORT=%s\n' "$tproxy_port" | sudo tee "$tproxy_dir/tproxy.env" >/dev/null
+
 tproxy_tmp="$(mktemp)"
 cat >"$tproxy_tmp" <<'EOF'
 #!/bin/sh
+TPROXY_PORT=10800
+[ -r /usr/local/etc/xray/tproxy.env ] && . /usr/local/etc/xray/tproxy.env
+
 tproxy_stop() {
   while ip rule del fwmark 1 table 100 2>/dev/null; do :; done
   ip route flush table 100 2>/dev/null
@@ -74,6 +98,10 @@ tproxy_stop() {
   iptables -t mangle -X XRAY 2>/dev/null
   iptables -t mangle -F XRAY_MASK 2>/dev/null
   iptables -t mangle -X XRAY_MASK 2>/dev/null
+  iptables -t nat -D PREROUTING -j XRAY_DNS 2>/dev/null
+  iptables -t nat -F XRAY_DNS 2>/dev/null
+  iptables -t nat -X XRAY_DNS 2>/dev/null
+  return 0
 }
 
 tproxy_start() {
@@ -83,6 +111,7 @@ tproxy_start() {
   lan_dev="$(ip route show default 2>/dev/null | awk '{for (i = 1; i < NF; i++) if ($i == "dev") {print $(i + 1); exit}}')"
 
   iptables -t mangle -N XRAY
+  iptables -t mangle -A XRAY -i waydroid0 -j RETURN
   iptables -t mangle -A XRAY -d 127.0.0.0/8 -j RETURN
   iptables -t mangle -A XRAY -d 224.0.0.0/4 -j RETURN
   iptables -t mangle -A XRAY -d 255.255.255.255/32 -j RETURN
@@ -94,8 +123,8 @@ tproxy_start() {
   iptables -t mangle -A XRAY -p tcp --dport 53 -j RETURN
   iptables -t mangle -A XRAY -p udp --dport 53 -j RETURN
   iptables -t mangle -A XRAY -j RETURN -m mark --mark 0xff
-  iptables -t mangle -A XRAY -p tcp -j TPROXY --on-ip 127.0.0.1 --on-port 10800 --tproxy-mark 1
-  iptables -t mangle -A XRAY -p udp -j TPROXY --on-ip 127.0.0.1 --on-port 10800 --tproxy-mark 1
+  iptables -t mangle -A XRAY -p tcp -j TPROXY --on-ip 127.0.0.1 --on-port "$TPROXY_PORT" --tproxy-mark 1
+  iptables -t mangle -A XRAY -p udp -j TPROXY --on-ip 127.0.0.1 --on-port "$TPROXY_PORT" --tproxy-mark 1
   iptables -t mangle -A PREROUTING -j XRAY
 
   iptables -t mangle -N XRAY_MASK
@@ -112,7 +141,13 @@ tproxy_start() {
   iptables -t mangle -A XRAY_MASK -j RETURN -m mark --mark 0xff
   iptables -t mangle -A XRAY_MASK -p tcp -j MARK --set-mark 1
   iptables -t mangle -A XRAY_MASK -p udp -j MARK --set-mark 1
-  iptables -t mangle -A OUTPUT -j XRAY_MASK
+  iptables -t mangle -A OUTPUT -m owner ! --gid-owner 23333 -j XRAY_MASK
+
+  iptables -t nat -N XRAY_DNS
+  iptables -t nat -A XRAY_DNS -i waydroid0 -p udp --dport 53 -j DNAT --to-destination 223.5.5.5:53
+  iptables -t nat -A XRAY_DNS -i waydroid0 -p tcp --dport 53 -j DNAT --to-destination 223.5.5.5:53
+  iptables -t nat -A PREROUTING -j XRAY_DNS
+  return 0
 }
 
 case "${1:-start}" in
@@ -122,6 +157,7 @@ start)
   ;;
 stop) tproxy_stop ;;
 esac
+exit 0
 EOF
 sudo install -m 0755 "$tproxy_tmp" "$tproxy_dir/tproxy.sh"
 rm -f "$tproxy_tmp"
@@ -145,7 +181,7 @@ fi
 tproxy_line="ExecStartPre=$tproxy_dir/tproxy.sh start
 ExecStopPost=$tproxy_dir/tproxy.sh stop"
 {{- else }}
-sudo rm -f /usr/local/etc/xray/tproxy.sh /etc/NetworkManager/dispatcher.d/90-xray-tproxy
+sudo rm -f /usr/local/etc/xray/tproxy.sh /usr/local/etc/xray/tproxy.env /etc/NetworkManager/dispatcher.d/90-xray-tproxy
 {{- end }}
 
 service_tmp="$(mktemp)"
@@ -157,6 +193,7 @@ Wants=network-online.target
 
 [Service]
 User=root
+Group=xray_tproxy
 ${tproxy_line}
 ExecStart=$xray_bin run -c $xray_config
 Restart=on-failure

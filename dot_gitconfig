@@ -3,8 +3,6 @@
 	email = ishio.liu@outlook.com
 [core]
 	editor = nvim
-[include]
-	path = ~/.config/proxy/gitconfig
 [url "git@github.com:"]
 	insteadOf = https://github.com/
 [init]

@@ -71,14 +71,20 @@ On Windows, use `Set-Proxy.cmd` with the same positional URLs and `-NoProxy`,
 
 ## Consumers
 
-The command stores the URLs once and derives all consumer settings from them:
+The command stores the URLs once and applies them through environment
+variables only:
 
 - Shell environment: `HTTP_PROXY`, `HTTPS_PROXY`, `ALL_PROXY`, and `NO_PROXY`
+  (sourced from `~/.config/proxy/config` by the shell profile on POSIX, set as
+  user-level environment variables on Windows)
 - SSH: the managed `proxy-ssh` helper used by `.ssh/config`
-- Git: `~/.config/proxy/gitconfig`, included by `~/.gitconfig`
-- pnpm: global config, managed by `pnpm config set --global`
 
-Do not edit these derived files directly. If a derived file is lost, run:
+No per-tool proxy configuration is written. Git, pnpm, npm, and other CLI
+tools read the environment variables directly. On Linux, transparent proxying
+(see [`XRAY`](XRAY.md)) covers everything else, including tools that ignore the
+environment.
+
+To re-apply the saved configuration to the current environment, run:
 
 ```sh
 set-proxy --sync

@@ -12,12 +12,11 @@ Options:
   --no-proxy <list>   Comma-separated hosts which bypass the proxy
   --clear             Remove all proxy settings
   --show              Show the saved proxy configuration
-  --sync              Regenerate configuration used by Git and pnpm
+  --sync              Re-apply the saved configuration to the environment
   -h, --help          Show this help
 
-The configuration is stored in ~/.config/proxy/config. Shell sessions and
-package installers read that file directly; Git and pnpm consume files
-regenerated from it.
+The configuration is stored in ~/.config/proxy/config. Shell sessions read
+that file directly; no per-tool proxy configuration is written.
 EOF
 }
 
@@ -103,39 +102,8 @@ apply_environment() {
   fi
 }
 
-sync_git() {
-  local proxy="$PROXY_HTTP"
-  [ -n "$proxy" ] || proxy="$PROXY_SOCKS"
-
-  if [ -n "$proxy" ]; then
-    printf '[http]\n    proxy = "%s"\n' "$proxy" > "$config_dir/gitconfig"
-  else
-    : > "$config_dir/gitconfig"
-  fi
-  chmod 600 "$config_dir/gitconfig"
-}
-
-sync_pnpm() {
-  command -v pnpm > /dev/null 2>&1 || return 0
-
-  if [ -n "$PROXY_HTTP" ]; then
-    pnpm config set --global proxy "$PROXY_HTTP"
-    pnpm config set --global https-proxy "$PROXY_HTTP"
-  else
-    pnpm config delete --global proxy || true
-    pnpm config delete --global https-proxy || true
-  fi
-}
-
 sync_consumers() {
-  sync_git
-  sync_pnpm
   printf 'Proxy configuration: %s\n' "$config_file"
-  printf 'Updated: Git'
-  if command -v pnpm > /dev/null 2>&1; then
-    printf ', pnpm'
-  fi
-  printf '\n'
 }
 
 http=""

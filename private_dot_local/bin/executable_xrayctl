@@ -1,0 +1,759 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+usage() {
+  cat << 'EOF'
+Usage: xrayctl <command> [args]
+
+Node management:
+  node add [tag] (vless://link | --address H --port N --uuid U --sni S
+                  --public-key P --short-id I) [--use]
+                      Add a vless+reality node; when the link carries a
+                      #tag the tag argument may be omitted
+  node rm <tag>       Remove a node
+  node list           List nodes (* marks the active node)
+  node use <tag>      Set the active node
+  node show [tag]     Show node details
+  node set <tag> [--address H] [--port N] [--uuid U] [--sni S]
+                  [--public-key P] [--short-id I]
+
+Routing rules (evaluated before all built-in rules):
+  route add direct|proxy|block <matcher...>
+                      matcher: domain:xxx.com, geosite:cn, full:example.com,
+                      regexp:pat, geoip:cn, or a bare IP/CIDR
+  route rm <matcher|index>
+  route list
+
+Ports:
+  port set [--socks N] [--tproxy N]
+
+Service:
+  status              Service state, active node, ports, route count
+  restart             Regenerate, validate, and restart the service
+  test                Validate the generated configuration
+  tproxy status       Transparent-proxy rule state
+  direct <cmd...>     Run cmd outside the transparent proxy
+  init                First-run: import ~/.config/xray/env, seed defaults
+
+Options:
+  --no-restart        Skip the service restart after a mutating command
+  -h, --help          Show this help
+
+State lives in ~/.config/xray/state.json; ~/.config/xray/config.json is
+generated output. Do not edit config.json by hand.
+EOF
+}
+
+die() {
+  printf 'xrayctl: %s\n' "$1" >&2
+  exit 1
+}
+
+config_dir="${XDG_CONFIG_HOME:-$HOME/.config}/xray"
+state_file="$config_dir/state.json"
+config_file="$config_dir/config.json"
+env_file="$config_dir/env"
+tproxy_env_file="/usr/local/etc/xray/tproxy.env"
+tproxy_group="xray_tproxy"
+opt_restart=1
+
+command -v jq >/dev/null 2>&1 || die "jq is required but not found"
+
+ensure_state() {
+  if [ ! -f "$state_file" ]; then
+    mkdir -p "$config_dir"
+    printf '%s\n' '{"version":1,"active":"","ports":{"socks":10808,"tproxy":10800},"nodes":[],"routes":[]}' > "$state_file"
+    chmod 600 "$state_file"
+  fi
+}
+
+load_state() {
+  ensure_state
+  jq -e 'has("active") and has("ports") and has("nodes") and has("routes")' "$state_file" >/dev/null \
+    || die "Invalid state file at $state_file"
+}
+
+state_update() {
+  local filter="$1"
+  shift
+  local temporary
+  temporary="$(mktemp "$config_dir/state.XXXXXX")"
+  if ! jq "$@" "$filter" "$state_file" > "$temporary"; then
+    rm -f "$temporary"
+    die "Failed to update $state_file"
+  fi
+  chmod 600 "$temporary"
+  mv "$temporary" "$state_file"
+}
+
+state_query() {
+  jq -r "$1" "$state_file"
+}
+
+maybe_restart() {
+  [ "$opt_restart" = 1 ] || return 0
+  command -v systemctl >/dev/null 2>&1 || return 0
+  systemctl is-active --quiet xray 2>/dev/null || return 0
+  command -v sudo >/dev/null 2>&1 || die "sudo is required to restart xray"
+  sudo systemctl restart xray
+  printf 'xray restarted\n'
+}
+
+regen() {
+  local active node_json new_config
+  active="$(state_query '.active // ""')"
+  [ -n "$active" ] || die "No active node; run: xrayctl node use <tag>"
+  node_json="$(jq -c --arg t "$active" '[.nodes[] | select(.tag == $t)][0] // empty' "$state_file")"
+  [ -n "$node_json" ] || die "Active node '$active' not found in $state_file"
+
+  new_config="$config_dir/config.new.json"
+  if ! jq -n \
+    --slurpfile s "$state_file" \
+    --argjson node "$node_json" \
+    --arg tag "$active" '
+    {
+      log: {loglevel: "warning"},
+      dns: {
+        hosts: {
+          "dns.google": ["8.8.8.8", "8.8.4.4"],
+          "dns.alidns.com": ["223.5.5.5", "223.6.6.6"],
+          "one.one.one.one": ["1.1.1.1", "1.0.0.1"],
+          "cloudflare-dns.com": ["104.16.249.249", "104.16.248.249"],
+          "doh.pub": ["1.12.12.12", "120.53.53.53"],
+          "dot.pub": ["1.12.12.12", "120.53.53.53"]
+        },
+        servers: [
+          {
+            address: "https://dns.alidns.com/dns-query",
+            domains: ["geosite:private", "geosite:cn"],
+            skipFallback: true
+          },
+          {
+            address: "223.5.5.5",
+            domains: ["full:dns.alidns.com", "full:cloudflare-dns.com"],
+            skipFallback: true
+          },
+          "https://cloudflare-dns.com/dns-query"
+        ]
+      },
+      inbounds: [
+        {
+          tag: "socks",
+          port: $s[0].ports.socks,
+          listen: "0.0.0.0",
+          protocol: "mixed",
+          sniffing: {
+            enabled: true,
+            destOverride: ["http", "tls"],
+            routeOnly: false
+          },
+          settings: {
+            auth: "noauth",
+            udp: true,
+            allowTransparent: false
+          }
+        },
+        {
+          tag: "tproxy",
+          port: $s[0].ports.tproxy,
+          listen: "0.0.0.0",
+          protocol: "tunnel",
+          settings: {
+            network: "tcp,udp",
+            followRedirect: true
+          },
+          streamSettings: {
+            sockopt: {tproxy: "tproxy"}
+          },
+          sniffing: {
+            enabled: true,
+            destOverride: ["http", "tls"]
+          }
+        }
+      ],
+      outbounds: [
+        {
+          tag: $tag,
+          protocol: "vless",
+          settings: {
+            vnext: [
+              {
+                address: $node.address,
+                port: $node.port,
+                users: [
+                  {
+                    id: $node.uuid,
+                    email: "t@t.tt",
+                    security: "auto",
+                    encryption: "none",
+                    flow: "xtls-rprx-vision"
+                  }
+                ]
+              }
+            ]
+          },
+          streamSettings: {
+            network: "tcp",
+            security: "reality",
+            sockopt: {mark: 255},
+            realitySettings: {
+              serverName: $node.sni,
+              fingerprint: "chrome",
+              show: false,
+              publicKey: $node.publicKey,
+              shortId: ($node.shortId // ""),
+              spiderX: ""
+            }
+          },
+          mux: {
+            enabled: false,
+            concurrency: -1
+          }
+        },
+        {
+          tag: "direct",
+          protocol: "freedom",
+          streamSettings: {sockopt: {mark: 255}}
+        },
+        {
+          tag: "block",
+          protocol: "blackhole"
+        }
+      ],
+      routing: {
+        domainStrategy: "AsIs",
+        rules:
+          ([($s[0].routes // [])[]
+            | {
+                type: "field",
+                network: "tcp,udp",
+                outboundTag: (if .action == "proxy" then $tag else .action end),
+                ((if (.matcher | test("^(domain:|geosite:|full:|regexp:)")) then "domain" else "ip" end)): [.matcher]
+              }]
+          + [
+              {type: "field", port: "443", network: "udp", outboundTag: "block"},
+              {type: "field", outboundTag: $tag, domain: ["geosite:google"]},
+              {type: "field", outboundTag: "direct", ip: ["geoip:private"]},
+              {type: "field", outboundTag: "direct", domain: ["geosite:private"]},
+              {type: "field", outboundTag: "direct", domain: ["domain:alidns.com", "domain:doh.pub", "domain:dot.pub", "domain:360.cn", "domain:onedns.net"]},
+              {type: "field", outboundTag: "direct", ip: ["geoip:cn"]},
+              {type: "field", outboundTag: "direct", domain: ["geosite:cn"]}
+            ])
+      }
+    }' > "$new_config"; then
+    rm -f "$new_config"
+    die "Failed to generate $config_file"
+  fi
+
+  if command -v xray >/dev/null 2>&1; then
+    if ! xray run -test -c "$new_config" >/dev/null 2>&1; then
+      rm -f "$new_config"
+      die "Generated configuration failed 'xray run -test'; the previous config is kept"
+    fi
+  fi
+
+  mv "$new_config" "$config_file"
+  printf 'Generated %s\n' "$config_file"
+  maybe_restart
+}
+
+percent_decode() {
+  printf '%b' "${1//%/\\x}"
+}
+
+vless_tag=""
+vless_address=""
+vless_port=""
+vless_uuid=""
+vless_sni=""
+vless_public_key=""
+vless_short_id=""
+
+parse_vless() {
+  local link="$1" query rest kv k v security="" network="" flow=""
+  case "$link" in
+    vless://*) ;;
+    *) die "Expected a vless:// link" ;;
+  esac
+  link="${link#vless://}"
+  if [[ "$link" == *"#"* ]]; then
+    vless_tag="$(percent_decode "${link##*#}")"
+    link="${link%#*}"
+  fi
+  query=""
+  if [[ "$link" == *"?"* ]]; then
+    query="${link#*\?}"
+    link="${link%%\?*}"
+  fi
+  rest="$link"
+  vless_uuid="${rest%@*}"
+  rest="${rest#*@}"
+  if [[ "$rest" == *:* ]]; then
+    vless_address="${rest%:*}"
+    vless_port="${rest##*:}"
+  else
+    vless_address="$rest"
+    vless_port=""
+  fi
+  vless_address="${vless_address#[}"
+  vless_address="${vless_address%]}"
+  while [ -n "$query" ]; do
+    kv="${query%%&*}"
+    if [ "$kv" = "$query" ]; then
+      query=""
+    else
+      query="${query#*&}"
+    fi
+    k="${kv%%=*}"
+    v=""
+    if [[ "$kv" == *"="* ]]; then
+      v="$(percent_decode "${kv#*=}")"
+    fi
+    case "$k" in
+      security) security="$v" ;;
+      sni) vless_sni="$v" ;;
+      pbk) vless_public_key="$v" ;;
+      sid) vless_short_id="$v" ;;
+      type) network="$v" ;;
+      flow) flow="$v" ;;
+    esac
+  done
+  [ -z "$security" ] || [ "$security" = "reality" ] || die "Only reality security is supported"
+  [ -z "$network" ] || [ "$network" = "tcp" ] || die "Only the tcp transport is supported"
+  [ -z "$flow" ] || [ "$flow" = "xtls-rprx-vision" ] || die "Only the xtls-rprx-vision flow is supported"
+}
+
+validate_node() {
+  local name="$1" value
+  [ -n "$vless_uuid" ] || die "$name is missing a UUID"
+  [[ "$vless_uuid" =~ ^[0-9a-fA-F-]{36}$ ]] || die "$name has an invalid UUID"
+  [ -n "$vless_address" ] || die "$name is missing an address"
+  [ -n "$vless_sni" ] || die "$name is missing sni"
+  [ -n "$vless_public_key" ] || die "$name is missing a public key"
+  [ -n "$vless_port" ] || vless_port="443"
+  [[ "$vless_port" =~ ^[0-9]+$ ]] || die "$name has an invalid port"
+  [ "$vless_port" -ge 1 ] && [ "$vless_port" -le 65535 ] || die "$name has an invalid port"
+  for value in "$vless_tag" "$vless_address" "$vless_uuid" "$vless_sni" "$vless_public_key" "$vless_short_id"; do
+    case "$value" in
+      *[[:space:]]* | *'"'* | *"'"* | *\\*) die "$name must not contain whitespace, quotes, or backslashes" ;;
+    esac
+  done
+}
+
+node_exists() {
+  jq -e --arg t "$1" 'any(.nodes[]; .tag == $t)' "$state_file" >/dev/null
+}
+
+node_add() {
+  load_state
+  local tag="" link="" address="" port="" uuid="" sni="" public_key="" short_id="" use=0
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      vless://*)
+        [ -z "$link" ] || die "Only one vless:// link is allowed"
+        link="$1"
+        shift
+        ;;
+      --address | --port | --uuid | --sni | --public-key | --short-id)
+        [ "$#" -ge 2 ] || die "$1 requires a value"
+        case "$1" in
+          --address) address="$2" ;;
+          --port) port="$2" ;;
+          --uuid) uuid="$2" ;;
+          --sni) sni="$2" ;;
+          --public-key) public_key="$2" ;;
+          --short-id) short_id="$2" ;;
+        esac
+        shift 2
+        ;;
+      --use)
+        use=1
+        shift
+        ;;
+      --*)
+        die "Unknown option: $1"
+        ;;
+      *)
+        [ -z "$tag" ] || die "Unexpected argument: $1"
+        tag="$1"
+        shift
+        ;;
+    esac
+  done
+
+  if [ -n "$link" ]; then
+    parse_vless "$link"
+    [ -n "$tag" ] || tag="$vless_tag"
+    [ -n "$tag" ] || die "The link has no #tag; provide a tag explicitly"
+  else
+    vless_address="$address"
+    vless_port="$port"
+    vless_uuid="$uuid"
+    vless_sni="$sni"
+    vless_public_key="$public_key"
+    vless_short_id="$short_id"
+  fi
+  validate_node "node '$tag'"
+  if node_exists "$tag"; then
+    die "Node '$tag' already exists; use: xrayctl node set"
+  fi
+
+  local was_empty
+  was_empty="$(state_query 'if .active == "" then "1" else "0" end')"
+  state_update '.nodes += [{tag: $t, address: $a, port: ($p | tonumber), uuid: $u, sni: $s, publicKey: $pk, shortId: $sid}]' \
+    --arg t "$tag" --arg a "$vless_address" --arg p "$vless_port" --arg u "$vless_uuid" \
+    --arg s "$vless_sni" --arg pk "$vless_public_key" --arg sid "$vless_short_id"
+  if [ "$was_empty" = 1 ] || [ "$use" = 1 ]; then
+    state_update '.active = $t' --arg t "$tag"
+  fi
+  printf 'Added node %s\n' "$tag"
+  regen
+}
+
+node_rm() {
+  load_state
+  [ "$#" -eq 1 ] || die "node rm requires exactly one tag"
+  local tag="$1"
+  node_exists "$tag" || die "Node '$tag' not found"
+  state_update 'del(.nodes[] | select(.tag == $t)) | if .active == $t then .active = "" else . end' --arg t "$tag"
+  printf 'Removed node %s\n' "$tag"
+  if [ -n "$(state_query '.active // ""')" ]; then
+    regen
+  else
+    printf 'No active node; run: xrayctl node use <tag>\n' >&2
+  fi
+}
+
+node_list() {
+  load_state
+  state_query '. as $s | .nodes[] | "\(.tag)\(if $s.active == .tag then " *" else "" end)\t\(.address):\(.port)"'
+}
+
+node_use() {
+  load_state
+  [ "$#" -eq 1 ] || die "node use requires exactly one tag"
+  local tag="$1"
+  node_exists "$tag" || die "Node '$tag' not found"
+  state_update '.active = $t' --arg t "$tag"
+  printf 'Active node: %s\n' "$tag"
+  regen
+}
+
+node_show() {
+  load_state
+  local tag="${1:-$(state_query '.active')}"
+  [ -n "$tag" ] || die "No active node; run: xrayctl node use <tag>"
+  node_exists "$tag" || die "Node '$tag' not found"
+  jq --arg t "$tag" '.nodes[] | select(.tag == $t)' "$state_file"
+}
+
+node_set() {
+  load_state
+  [ "$#" -ge 1 ] || die "node set requires a tag"
+  local tag="$1"
+  shift
+  node_exists "$tag" || die "Node '$tag' not found"
+  local address="" port="" uuid="" sni="" public_key="" short_id=""
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --address | --port | --uuid | --sni | --public-key | --short-id)
+        [ "$#" -ge 2 ] || die "$1 requires a value"
+        case "$1" in
+          --address) address="$2" ;;
+          --port) port="$2" ;;
+          --uuid) uuid="$2" ;;
+          --sni) sni="$2" ;;
+          --public-key) public_key="$2" ;;
+          --short-id) short_id="$2" ;;
+        esac
+        shift 2
+        ;;
+      *) die "Unknown option: $1" ;;
+    esac
+  done
+  local value
+  for value in "$address" "$port" "$uuid" "$sni" "$public_key" "$short_id"; do
+    case "$value" in
+      *[[:space:]]* | *'"'* | *"'"* | *\\*) die "Values must not contain whitespace, quotes, or backslashes" ;;
+    esac
+  done
+  [ -n "$port" ] && { [[ "$port" =~ ^[0-9]+$ ]] && [ "$port" -ge 1 ] && [ "$port" -le 65535 ] || die "Invalid port: $port"; }
+  state_update '
+    .nodes |= map(if .tag == $t then . + {
+      address: (if $a == "" then .address else $a end),
+      port: (if $p == "" then .port else ($p | tonumber) end),
+      uuid: (if $u == "" then .uuid else $u end),
+      sni: (if $s == "" then .sni else $s end),
+      publicKey: (if $pk == "" then .publicKey else $pk end),
+      shortId: (if $sid == "" then .shortId else $sid end)
+    } else . end)' \
+    --arg t "$tag" --arg a "$address" --arg p "$port" --arg u "$uuid" \
+    --arg s "$sni" --arg pk "$public_key" --arg sid "$short_id"
+  printf 'Updated node %s\n' "$tag"
+  [ "$(state_query '.active')" = "$tag" ] && regen
+  true
+}
+
+cmd_node() {
+  [ "$#" -ge 1 ] || die "node requires a subcommand: add, rm, list, use, show, set"
+  local sub="$1"
+  shift
+  case "$sub" in
+    add) node_add "$@" ;;
+    rm) node_rm "$@" ;;
+    list) node_list "$@" ;;
+    use) node_use "$@" ;;
+    show) node_show "$@" ;;
+    set) node_set "$@" ;;
+    *) die "Unknown node subcommand: $sub" ;;
+  esac
+}
+
+validate_matcher() {
+  local m="$1"
+  case "$m" in
+    domain:* | geosite:* | full:* | regexp:* | geoip:*) return 0 ;;
+  esac
+  [[ "$m" =~ ^[0-9a-fA-F:.]+$ ]] || die "Invalid matcher: $m (use domain: geosite: full: regexp: geoip: or a bare IP/CIDR)"
+}
+
+route_add() {
+  load_state
+  [ "$#" -ge 2 ] || die "route add requires an action and at least one matcher"
+  local action="$1"
+  shift
+  case "$action" in
+    direct | proxy | block) ;;
+    *) die "Action must be direct, proxy, or block" ;;
+  esac
+  local m
+  for m in "$@"; do
+    validate_matcher "$m"
+    jq -e --arg m "$m" 'any(.routes[]; .matcher == $m)' "$state_file" >/dev/null \
+      && die "Route '$m' already exists; run: xrayctl route rm $m first"
+  done
+  for m in "$@"; do
+    state_update '.routes += [{action: $a, matcher: $m}]' --arg a "$action" --arg m "$m"
+  done
+  printf 'Added %d route(s)\n' "$#"
+  regen
+}
+
+route_rm() {
+  load_state
+  [ "$#" -eq 1 ] || die "route rm requires a matcher or index"
+  local target="$1" count
+  if [[ "$target" =~ ^[0-9]+$ ]]; then
+    count="$(jq '.routes | length' "$state_file")"
+    [ "$target" -ge 1 ] && [ "$target" -le "$count" ] || die "Index out of range: $target (1-$count)"
+    state_update 'del(.routes[$i - 1])' --argjson i "$target"
+  else
+    jq -e --arg m "$target" 'any(.routes[]; .matcher == $m)' "$state_file" >/dev/null || die "Route not found: $target"
+    state_update 'del(.routes[] | select(.matcher == $m))' --arg m "$target"
+  fi
+  printf 'Removed route %s\n' "$target"
+  regen
+}
+
+route_list() {
+  load_state
+  state_query '.routes | to_entries[] | "\(.key + 1) \(.value.action) \(.value.matcher)"'
+}
+
+cmd_route() {
+  [ "$#" -ge 1 ] || die "route requires a subcommand: add, rm, list"
+  local sub="$1"
+  shift
+  case "$sub" in
+    add) route_add "$@" ;;
+    rm) route_rm "$@" ;;
+    list) route_list "$@" ;;
+    *) die "Unknown route subcommand: $sub" ;;
+  esac
+}
+
+validate_port() {
+  [[ "$1" =~ ^[0-9]+$ ]] || die "Invalid port: $1"
+  [ "$1" -ge 1 ] && [ "$1" -le 65535 ] || die "Invalid port: $1"
+}
+
+write_tproxy_env() {
+  command -v sudo >/dev/null 2>&1 || die "sudo is required to update $tproxy_env_file"
+  printf 'TPROXY_PORT=%s\n' "$1" | sudo tee "$tproxy_env_file" >/dev/null
+}
+
+port_set() {
+  load_state
+  local socks="" tproxy="" current_socks current_tproxy
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --socks | --tproxy)
+        [ "$#" -ge 2 ] || die "$1 requires a value"
+        case "$1" in
+          --socks) socks="$2" ;;
+          --tproxy) tproxy="$2" ;;
+        esac
+        shift 2
+        ;;
+      *) die "Unknown option: $1" ;;
+    esac
+  done
+  [ -n "$socks" ] || [ -n "$tproxy" ] || die "port set requires --socks or --tproxy"
+  current_socks="$(state_query '.ports.socks')"
+  current_tproxy="$(state_query '.ports.tproxy')"
+  [ -n "$socks" ] || socks="$current_socks"
+  [ -n "$tproxy" ] || tproxy="$current_tproxy"
+  validate_port "$socks"
+  validate_port "$tproxy"
+  [ "$socks" != "$tproxy" ] || die "The socks and tproxy ports must differ"
+  state_update '.ports = {socks: ($s | tonumber), tproxy: ($t | tonumber)}' --arg s "$socks" --arg t "$tproxy"
+  if [ "$tproxy" != "$current_tproxy" ]; then
+    write_tproxy_env "$tproxy"
+  fi
+  printf 'Ports: socks=%s tproxy=%s\n' "$socks" "$tproxy"
+  regen
+}
+
+cmd_port() {
+  [ "$#" -ge 1 ] || die "port requires a subcommand: set"
+  local sub="$1"
+  shift
+  case "$sub" in
+    set) port_set "$@" ;;
+    *) die "Unknown port subcommand: $sub" ;;
+  esac
+}
+
+cmd_status() {
+  load_state
+  local service_state="unavailable"
+  if command -v systemctl >/dev/null 2>&1; then
+    service_state="$(systemctl is-active xray 2>/dev/null || true)"
+    [ -n "$service_state" ] || service_state="unknown"
+  fi
+  printf 'service: %s\n' "$service_state"
+  printf 'node: %s\n' "$(state_query '.active')"
+  printf 'ports: socks=%s tproxy=%s\n' "$(state_query '.ports.socks')" "$(state_query '.ports.tproxy')"
+  printf 'routes: %s custom\n' "$(jq '.routes | length' "$state_file")"
+}
+
+cmd_restart() {
+  load_state
+  regen
+}
+
+cmd_test() {
+  load_state
+  [ -f "$config_file" ] || die "No generated config at $config_file; run: xrayctl init"
+  command -v xray >/dev/null 2>&1 || die "xray not found"
+  xray run -test -c "$config_file"
+}
+
+cmd_tproxy() {
+  [ "$#" -ge 1 ] || die "tproxy requires a subcommand: status"
+  local sub="$1"
+  shift
+  case "$sub" in
+    status) ;;
+    *) die "Unknown tproxy subcommand: $sub" ;;
+  esac
+  if command -v systemctl >/dev/null 2>&1; then
+    printf 'service: %s\n' "$(systemctl is-active xray 2>/dev/null || true)"
+  fi
+  if ip rule show 2>/dev/null | grep -q 'fwmark 0x1 lookup 100'; then
+    printf 'policy routing: active\n'
+  else
+    printf 'policy routing: inactive\n'
+  fi
+  if sudo -n iptables -t mangle -S XRAY >/dev/null 2>&1; then
+    printf 'mangle XRAY chain: present\n'
+  else
+    printf 'mangle XRAY chain: absent (or sudo credentials required)\n'
+  fi
+  if sudo -n iptables -t nat -S XRAY_DNS >/dev/null 2>&1; then
+    printf 'nat XRAY_DNS chain: present\n'
+  else
+    printf 'nat XRAY_DNS chain: absent (or sudo credentials required)\n'
+  fi
+}
+
+cmd_direct() {
+  [ "$#" -ge 1 ] || die "direct requires a command"
+  if id -nG | tr ' ' '\n' | grep -qx "$tproxy_group"; then
+    exec sg "$tproxy_group" -c "$*"
+  fi
+  command -v sudo >/dev/null 2>&1 || die "Join $tproxy_group and re-login, or install sudo"
+  exec sudo -g "$tproxy_group" -- "$@"
+}
+
+import_env() {
+  local tag address port uuid sni public_key short_id
+  tag="$(sed -n 's/^XRAY_TAG=//p' "$env_file")"
+  address="$(sed -n 's/^XRAY_ADDRESS=//p' "$env_file")"
+  port="$(sed -n 's/^XRAY_PORT=//p' "$env_file")"
+  uuid="$(sed -n 's/^XRAY_UUID=//p' "$env_file")"
+  sni="$(sed -n 's/^XRAY_SNI=//p' "$env_file")"
+  public_key="$(sed -n 's/^XRAY_PUBLIC_KEY=//p' "$env_file")"
+  short_id="$(sed -n 's/^XRAY_SHORT_ID=//p' "$env_file")"
+  [ -n "$address" ] && [ -n "$uuid" ] || die "$env_file lacks XRAY_ADDRESS or XRAY_UUID"
+  vless_tag="$tag"
+  vless_address="$address"
+  vless_port="${port:-443}"
+  vless_uuid="$uuid"
+  vless_sni="$sni"
+  vless_public_key="$public_key"
+  vless_short_id="$short_id"
+  validate_node "env node"
+  state_update '.nodes = [{tag: $t, address: $a, port: ($p | tonumber), uuid: $u, sni: $s, publicKey: $pk, shortId: $sid}]
+    | .active = $t
+    | .routes = [{action: "direct", matcher: "domain:sourceforge.net"}, {action: "direct", matcher: "domain:stackoverflow.com"}]' \
+    --arg t "$vless_tag" --arg a "$vless_address" --arg p "$vless_port" --arg u "$vless_uuid" \
+    --arg s "$vless_sni" --arg pk "$vless_public_key" --arg sid "$vless_short_id"
+  printf 'Imported node %s from %s\n' "$vless_tag" "$env_file"
+  printf 'The env file is deprecated; state.json is authoritative and %s may be deleted\n' "$env_file"
+}
+
+cmd_init() {
+  if [ ! -f "$state_file" ]; then
+    ensure_state
+    if [ -f "$env_file" ]; then
+      import_env
+    else
+      printf 'Created empty state at %s\n' "$state_file"
+      printf 'Add a node: xrayctl node add <tag> vless://...\n'
+      return 0
+    fi
+  fi
+  regen
+}
+
+main() {
+  local args=()
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --no-restart) opt_restart=0 ;;
+      *) args+=("$1") ;;
+    esac
+    shift
+  done
+  set -- "${args[@]}"
+  [ "$#" -ge 1 ] || { usage >&2; exit 2; }
+  local cmd="$1"
+  shift
+  case "$cmd" in
+    node) cmd_node "$@" ;;
+    route) cmd_route "$@" ;;
+    port) cmd_port "$@" ;;
+    status) cmd_status "$@" ;;
+    restart) cmd_restart "$@" ;;
+    test) cmd_test "$@" ;;
+    tproxy) cmd_tproxy "$@" ;;
+    direct) cmd_direct "$@" ;;
+    init) cmd_init "$@" ;;
+    -h | --help | help) usage ;;
+    *) usage >&2; exit 2 ;;
+  esac
+}
+
+main "$@"

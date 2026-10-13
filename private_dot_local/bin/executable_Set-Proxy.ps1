@@ -26,9 +26,11 @@ Options:
   -NoProxy <list>     Comma-separated hosts which bypass the proxy
   -Clear              Remove all proxy settings
   -Show               Show the saved proxy configuration
-  -Sync               Regenerate Git and pnpm configuration
+  -Sync               Re-apply the saved configuration to the environment
 
-The configuration is stored in %USERPROFILE%\.config\proxy\config.
+The configuration is stored in %USERPROFILE%\.config\proxy\config and is
+applied through environment variables only; no per-tool proxy configuration
+is written.
 '@ | Write-Host
 }
 
@@ -146,48 +148,6 @@ function Set-ManagedEnvironment {
     }
 }
 
-function Update-GitProxyConfiguration {
-    param(
-        [Parameter(Mandatory = $true)][string]$ConfigFile,
-        [Parameter(Mandatory = $true)][hashtable]$Values
-    )
-
-    $proxy = if ($Values.Http) { $Values.Http } else { $Values.Socks }
-    if ($proxy) {
-        "[http]`n    proxy = `"$proxy`"" | Set-Content -LiteralPath $ConfigFile -Encoding ascii
-    } else {
-        "" | Set-Content -LiteralPath $ConfigFile -Encoding ascii
-    }
-}
-
-function Update-PnpmProxyConfiguration {
-    param([Parameter(Mandatory = $true)][hashtable]$Values)
-
-    if (-not (Get-Command pnpm -ErrorAction SilentlyContinue)) {
-        return
-    }
-
-    if ($Values.Http) {
-        pnpm config set --global proxy $Values.Http
-        if ($LASTEXITCODE -ne 0) {
-            throw "pnpm failed to update its proxy configuration"
-        }
-        pnpm config set --global https-proxy $Values.Http
-        if ($LASTEXITCODE -ne 0) {
-            throw "pnpm failed to update its HTTPS proxy configuration"
-        }
-    } else {
-        pnpm config delete --global proxy
-        if ($LASTEXITCODE -ne 0) {
-            throw "pnpm failed to remove its proxy configuration"
-        }
-        pnpm config delete --global https-proxy
-        if ($LASTEXITCODE -ne 0) {
-            throw "pnpm failed to remove its HTTPS proxy configuration"
-        }
-    }
-}
-
 $configPath = Get-ProxyConfigurationPath
 
 $optionsSelected = $Clear -or $Show -or $Sync -or $Http -or $Socks -or $NoProxy
@@ -237,9 +197,4 @@ if ($Clear) {
     Set-ManagedEnvironment -Values $values
 }
 
-$gitConfig = Join-Path (Split-Path -Parent $configPath) "gitconfig"
-Update-GitProxyConfiguration -ConfigFile $gitConfig -Values $values
-Update-PnpmProxyConfiguration -Values $values
-
 Write-Host "Proxy configuration: $configPath"
-Write-Host "Updated: Git, pnpm"
