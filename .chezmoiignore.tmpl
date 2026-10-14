@@ -10,6 +10,7 @@ PSScriptAnalyzerSettings.psd1
 {{ if eq .chezmoi.os "windows" }}
 **/*.sh
 **/*.sh.tmpl
+.vim/
 {{ else }}
 **/*.ps1
 **/*.ps1.tmpl
@@ -17,6 +18,9 @@ PSScriptAnalyzerSettings.psd1
 **/*.vbs
 .wslconfig
 AppData/
+.config/vim/plugged/
+.config/vim/autoload/
+.config/vim/viminfo
 {{ end }}
 
 {{- if ne .chezmoi.os "linux" }}

@@ -1,0 +1,5 @@
+set nocompatible
+
+source <sfile>:h/opt.vim
+source <sfile>:h/keymap.vim
+source <sfile>:h/plugins.vim
