@@ -23,6 +23,7 @@
 | `80-89` | Terminal applications |
 | `90-99` | Input support |
 | `g0-g9` | Gaming host libraries |
+| `d0-d9` | Desktop (GNOME) enhancement |
 
 ## Windows
 
@@ -60,6 +61,7 @@ $env:SCOOP_DIR = "D:\Scoop"
 | `terminal` | POSIX `tmux`, `kitty`; Windows MSYS2 `tmux` and Windows Terminal |
 | `input` | Linux `fcitx5` with Chinese addons and Rime (`librime`, 白霜拼音); `breeze-cursor-theme` set as the default cursor (Linux) |
 | `gaming` | Linux host libraries for Lutris, umu, and Proton: 32-bit and 64-bit Vulkan loaders, 32-bit ALSA/PulseAudio/OpenAL/Mesa, `gamemode`, `libayatana-appindicator` (also used by MaaEnd) |
+| `desktop` | Linux GNOME extensions tooling: `extension-manager` (GNOME Shell extensions Just Perfection and Kimpanel are installed user-level by a script from extensions.gnome.org; only kimpanel's `stylesheet.css` is repo-managed) |
 
 ## Targeted installation
 

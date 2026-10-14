@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+command -v gsettings >/dev/null 2>&1 || exit 0
+command -v dconf >/dev/null 2>&1 || exit 0
+
+gsettings set org.gnome.shell enabled-extensions \
+  "['just-perfection-desktop@just-perfection', 'kimpanel@kde.org']"
+
+dconf write /org/gnome/shell/extensions/just-perfection/notification-banner-position 2
+dconf write /org/gnome/shell/extensions/kimpanel/font "'LXGW WenKai Mono {{ .fontSize }}'"
+dconf reset -f /org/gnome/shell/extensions/notification-configurator/

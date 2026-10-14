@@ -24,13 +24,6 @@ install_fcitx5() {
     else
       echo "rime-frost-git is already installed"
     fi
-    if ! pacman -Q gnome-shell-extension-kimpanel-git >/dev/null 2>&1; then
-      echo "Installing gnome-shell-extension-kimpanel-git from AUR..."
-      paru -S --needed --noconfirm gnome-shell-extension-kimpanel-git ||
-        echo "Warning: Could not install gnome-shell-extension-kimpanel-git from AUR." >&2
-    else
-      echo "gnome-shell-extension-kimpanel-git is already installed"
-    fi
   fi
 
   return 0

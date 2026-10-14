@@ -49,6 +49,9 @@ category_enabled() {
     gaming)
       [ "$install_gaming" = "true" ]
       ;;
+    desktop)
+      [ "$install_desktop" = "true" ]
+      ;;
     *)
       return 2
       ;;
@@ -67,6 +70,7 @@ install_operations="${DOTS_INSTALL_OPERATIONS:-true}"
 install_terminal="${DOTS_INSTALL_TERMINAL:-true}"
 install_input="${DOTS_INSTALL_INPUT:-false}"
 install_gaming="${DOTS_INSTALL_GAMING:-true}"
+install_desktop="${DOTS_INSTALL_DESKTOP:-false}"
 
 shopt -s nullglob
 packages=("$SCRIPT_DIR/packages/posix/"*.sh)
@@ -119,10 +123,13 @@ else
       g[0-9]-*)
         pkg_category=gaming
         ;;
+      d[0-9]-*)
+        pkg_category=desktop
+        ;;
     esac
 
     case "$pkg_category" in
-      shell | build | runtimes | editor | ai | utilities | operations | terminal | input | gaming)
+      shell | build | runtimes | editor | ai | utilities | operations | terminal | input | gaming | desktop)
         if ! category_enabled "$pkg_category"; then
           echo "==> Skipping $pkg_basename"
           continue

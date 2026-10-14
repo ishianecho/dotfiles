@@ -86,6 +86,7 @@ pacman_package_name() {
   sqlite3) echo "sqlite" ;;
   openssh-client) echo "openssh" ;;
   breeze-cursor-theme) echo "breeze" ;;
+  gnome-shell-extension-manager) echo "extension-manager" ;;
   *) echo "$1" ;;
   esac
 }
@@ -127,7 +128,7 @@ brew_package_name() {
   fd-find) echo "fd" ;;
   sqlite3) echo "sqlite" ;;
   breeze-cursor-theme) echo "" ;;
-  fcitx5 | fcitx5-chinese-addons | fcitx5-rime | librime | wl-clipboard | xclip | xray) echo "" ;;
+  fcitx5 | fcitx5-chinese-addons | fcitx5-rime | librime | wl-clipboard | xclip | xray | gnome-shell-extension-manager) echo "" ;;
   *) echo "$1" ;;
   esac
 }
