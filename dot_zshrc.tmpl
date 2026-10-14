@@ -1,0 +1,36 @@
+{{ if eq .chezmoi.os "windows" -}}
+if [[ -n "${WT_SESSION:-}" ]]; then
+  __wt_report_cwd() {
+    local wt_cwd="$PWD"
+    if command -v cygpath >/dev/null 2>&1; then
+      wt_cwd="$(cygpath -w "$PWD")"
+    fi
+    printf '\e]9;9;"%s"\e\\' "$wt_cwd"
+  }
+  if ((! ${precmd_functions[(Ie)__wt_report_cwd]})); then
+    precmd_functions+=(__wt_report_cwd)
+  fi
+fi
+{{ end -}}
+
+source "$XDG_CONFIG_HOME/zsh/opt.zsh"
+source "$XDG_CONFIG_HOME/zsh/alias.zsh"
+source "$XDG_CONFIG_HOME/zsh/plugins.zsh"
+source "$XDG_CONFIG_HOME/zsh/completion.zsh"
+source "$XDG_CONFIG_HOME/zsh/theme.zsh"
+
+source "$XDG_CONFIG_HOME/zsh/keybinds.zsh"
+source "$XDG_CONFIG_HOME/zsh/kitty.zsh"
+
+case ":$PATH:" in
+*":$MISE_DATA_DIR/shims:"*) ;;
+*) export PATH="$MISE_DATA_DIR/shims:$PATH" ;;
+esac
+
+npx() {
+  if [ -n "$1" ] && [ -x "./node_modules/.bin/$1" ]; then
+    pnpm exec "$@"
+  else
+    pnpm dlx "$@"
+  fi
+}

@@ -1,73 +1,69 @@
 # Expose Windows-managed tools from MSYS2 before shell initialization runs
 # applications. POSIX-compatible so zsh and bash can both source this file.
 
-case "$(uname -s 2>/dev/null)" in
-MSYS_NT*|MINGW*_NT*)
-    if [ -z "${MSYS2_EXTERNAL_PATHS_DONE:-}" ] && command -v cygpath >/dev/null 2>&1; then
-        msys2_user_profile="$(cygpath -u "${USERPROFILE:-$HOME}")"
-        msys2_local_apps="$(cygpath -u "${LOCALAPPDATA:-$msys2_user_profile/AppData/Local}")"
-        msys2_program_files="$(cygpath -u "${ProgramFiles:-/c/Program Files}")"
+if [ -z "${MSYS2_EXTERNAL_PATHS_DONE:-}" ] && command -v cygpath >/dev/null 2>&1; then
+    msys2_user_profile="$(cygpath -u "${USERPROFILE:-$HOME}")"
+    msys2_local_apps="$(cygpath -u "${LOCALAPPDATA:-$msys2_user_profile/AppData/Local}")"
+    msys2_program_files="$(cygpath -u "${ProgramFiles:-/c/Program Files}")"
 
-        if [ -n "${SCOOP:-}" ]; then
-            msys2_scoop_root="$(cygpath -u "$SCOOP")"
-        else
-            msys2_scoop_root="$msys2_user_profile/scoop"
-        fi
-
-        msys2_uv_cache="$msys2_scoop_root/persist/uv/cache"
-        msys2_uv_python_install="$msys2_scoop_root/persist/uv/python/versions"
-        msys2_uv_tool_bin="$msys2_scoop_root/persist/uv/tools/shims"
-        msys2_uv_tool_install="$msys2_scoop_root/persist/uv/tools/versions"
-        export UV_CACHE_DIR="$(cygpath -w "$msys2_uv_cache")"
-        export UV_PYTHON_INSTALL_DIR="$(cygpath -w "$msys2_uv_python_install")"
-        export UV_TOOL_BIN_DIR="$(cygpath -w "$msys2_uv_tool_bin")"
-        export UV_TOOL_DIR="$(cygpath -w "$msys2_uv_tool_install")"
-
-        msys2_pnpm_home="$msys2_local_apps/pnpm"
-        msys2_cargo_home="$msys2_scoop_root/persist/rustup-msvc/.cargo"
-        msys2_rustup_home="$msys2_scoop_root/persist/rustup-msvc/.rustup"
-
-        export PNPM_HOME="$(cygpath -w "$msys2_pnpm_home")"
-        export CARGO_HOME="$(cygpath -w "$msys2_cargo_home")"
-        export RUSTUP_HOME="$(cygpath -w "$msys2_rustup_home")"
-
-        for msys2_path in \
-            "$msys2_scoop_root/apps/git/current/cmd" \
-            "$msys2_program_files/Git/cmd" \
-            "$msys2_pnpm_home" \
-            "$msys2_pnpm_home/bin" \
-            "$msys2_scoop_root/shims" \
-            "$msys2_scoop_root/apps/mingw/current/bin" \
-            "$msys2_scoop_root/apps/rustup-msvc/current/.cargo/bin" \
-            "$msys2_uv_tool_bin" \
-            "$msys2_user_profile/.local/share/mise/shims" \
-            "$msys2_local_apps/Neovim/bin" \
-            "$msys2_local_apps/Microsoft/WindowsApps" \
-            "$msys2_local_apps/Microsoft/WinGet/Links" \
-            "$msys2_scoop_root/persist/rustup-msvc/.cargo/bin"; do
-            if [ -d "$msys2_path" ]; then
-                case ":$PATH:" in
-                    *":$msys2_path:"*) ;;
-                    *) PATH="$msys2_path:$PATH" ;;
-                esac
-            fi
-        done
-
-        case ":$PATH:" in
-            *":/ucrt64/bin:"*) ;;
-            *) PATH="$PATH:/ucrt64/bin" ;;
-        esac
-        for msys2_ai_command in codex claude codegraph; do
-            if [ -x "/ucrt64/bin/$msys2_ai_command" ]; then
-                eval "${msys2_ai_command}() {
-                    /ucrt64/bin/${msys2_ai_command} \"\$@\"
-                }"
-            fi
-        done
-        unset msys2_ai_command
-
-        export PATH MSYS2_EXTERNAL_PATHS_DONE=1
-        unset msys2_user_profile msys2_local_apps msys2_program_files msys2_scoop_root msys2_pnpm_home msys2_cargo_home msys2_rustup_home msys2_uv_cache msys2_uv_python_install msys2_uv_tool_bin msys2_uv_tool_install msys2_path
+    if [ -n "${SCOOP:-}" ]; then
+        msys2_scoop_root="$(cygpath -u "$SCOOP")"
+    else
+        msys2_scoop_root="$msys2_user_profile/scoop"
     fi
-    ;;
-esac
+
+    msys2_uv_cache="$msys2_scoop_root/persist/uv/cache"
+    msys2_uv_python_install="$msys2_scoop_root/persist/uv/python/versions"
+    msys2_uv_tool_bin="$msys2_scoop_root/persist/uv/tools/shims"
+    msys2_uv_tool_install="$msys2_scoop_root/persist/uv/tools/versions"
+    export UV_CACHE_DIR="$(cygpath -w "$msys2_uv_cache")"
+    export UV_PYTHON_INSTALL_DIR="$(cygpath -w "$msys2_uv_python_install")"
+    export UV_TOOL_BIN_DIR="$(cygpath -w "$msys2_uv_tool_bin")"
+    export UV_TOOL_DIR="$(cygpath -w "$msys2_uv_tool_install")"
+
+    msys2_pnpm_home="$msys2_local_apps/pnpm"
+    msys2_cargo_home="$msys2_scoop_root/persist/rustup-msvc/.cargo"
+    msys2_rustup_home="$msys2_scoop_root/persist/rustup-msvc/.rustup"
+
+    export PNPM_HOME="$(cygpath -w "$msys2_pnpm_home")"
+    export CARGO_HOME="$(cygpath -w "$msys2_cargo_home")"
+    export RUSTUP_HOME="$(cygpath -w "$msys2_rustup_home")"
+
+    for msys2_path in \
+        "$msys2_scoop_root/apps/git/current/cmd" \
+        "$msys2_program_files/Git/cmd" \
+        "$msys2_pnpm_home" \
+        "$msys2_pnpm_home/bin" \
+        "$msys2_scoop_root/shims" \
+        "$msys2_scoop_root/apps/mingw/current/bin" \
+        "$msys2_scoop_root/apps/rustup-msvc/current/.cargo/bin" \
+        "$msys2_uv_tool_bin" \
+        "$msys2_user_profile/.local/share/mise/shims" \
+        "$msys2_local_apps/Neovim/bin" \
+        "$msys2_local_apps/Microsoft/WindowsApps" \
+        "$msys2_local_apps/Microsoft/WinGet/Links" \
+        "$msys2_scoop_root/persist/rustup-msvc/.cargo/bin"; do
+        if [ -d "$msys2_path" ]; then
+            case ":$PATH:" in
+                *":$msys2_path:"*) ;;
+                *) PATH="$msys2_path:$PATH" ;;
+            esac
+        fi
+    done
+
+    case ":$PATH:" in
+        *":/ucrt64/bin:"*) ;;
+        *) PATH="$PATH:/ucrt64/bin" ;;
+    esac
+    for msys2_ai_command in codex claude codegraph; do
+        if [ -x "/ucrt64/bin/$msys2_ai_command" ]; then
+            eval "${msys2_ai_command}() {
+                /ucrt64/bin/${msys2_ai_command} \"\$@\"
+            }"
+        fi
+    done
+    unset msys2_ai_command
+
+    export PATH MSYS2_EXTERNAL_PATHS_DONE=1
+    unset msys2_user_profile msys2_local_apps msys2_program_files msys2_scoop_root msys2_pnpm_home msys2_cargo_home msys2_rustup_home msys2_uv_cache msys2_uv_python_install msys2_uv_tool_bin msys2_uv_tool_install msys2_path
+fi

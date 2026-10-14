@@ -3,6 +3,7 @@
 	email = 212360854+ishianecho@users.noreply.github.com
 [core]
 	editor = nvim
+	pager = bat
 [url "git@github.com:"]
 	insteadOf = https://github.com/
 [init]

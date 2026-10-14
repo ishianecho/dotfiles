@@ -14,14 +14,14 @@ _zsh_keybinds() {
   key[Delete]="${terminfo[kdch1]}"
   key[PageUp]="${terminfo[kpp]}"
   key[PageDown]="${terminfo[knp]}"
-  key[Shift-Tab]="${terminfo[kcbt]}"
+  key[ShiftTab]="${terminfo[kcbt]}"
   [[ -n "$key[Home]" ]] && bindkey -- "$key[Home]" beginning-of-line
   [[ -n "$key[End]" ]] && bindkey -- "$key[End]" end-of-line
   [[ -n "$key[Insert]" ]] && bindkey -- "$key[Insert]" overwrite-mode
   [[ -n "$key[Delete]" ]] && bindkey -- "$key[Delete]" delete-char
   [[ -n "$key[PageUp]" ]] && bindkey -- "$key[PageUp]" up-line-or-history
   [[ -n "$key[PageDown]" ]] && bindkey -- "$key[PageDown]" down-line-or-history
-  [[ -n "$key[Shift-Tab]" ]] && bindkey -- "$key[Shift-Tab]" reverse-menu-complete
+  [[ -n "$key[ShiftTab]" ]] && bindkey -- "$key[ShiftTab]" reverse-menu-complete
 
   if [ -f /usr/share/fzf/key-bindings.zsh ]; then
     source /usr/share/fzf/key-bindings.zsh
@@ -38,7 +38,7 @@ _zsh_keybinds() {
   fi
 }
 
-zstyle ':fzf-tab:*' fzf-bindings 'ctrl-j:down' 'ctrl-k:up' 'ctrl-u:half-page-up' 'ctrl-d:half-page-down'
+zstyle ':fzf-tab:*' fzf-bindings 'tab:accept' 'ctrl-j:down' 'ctrl-k:up' 'ctrl-u:half-page-up' 'ctrl-d:half-page-down'
 export FZF_CTRL_R_OPTS="${FZF_CTRL_R_OPTS:+$FZF_CTRL_R_OPTS }--bind=ctrl-j:down,ctrl-k:up,ctrl-u:half-page-up,ctrl-d:half-page-down"
 export FZF_CTRL_T_OPTS="${FZF_CTRL_T_OPTS:+$FZF_CTRL_T_OPTS }--bind=ctrl-j:down,ctrl-k:up,ctrl-u:half-page-up,ctrl-d:half-page-down"
 
