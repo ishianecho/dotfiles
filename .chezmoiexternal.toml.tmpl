@@ -43,6 +43,16 @@ executable = true
 type = "file"
 url = "https://raw.githubusercontent.com/ishianecho/bin/main/posix/completion"
 executable = true
+{{ if ne .chezmoi.os "windows" }}
+[".local/bin/notify"]
+type = "file"
+url = "https://raw.githubusercontent.com/ishianecho/bin/main/posix/notify"
+executable = true
+[".local/bin/port"]
+type = "file"
+url = "https://raw.githubusercontent.com/ishianecho/bin/main/posix/port"
+executable = true
+{{ end }}
 {{ $ext := "" }}
 {{ if eq .chezmoi.os "windows" }}
 {{   $ext = ".exe" }}
