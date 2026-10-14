@@ -24,20 +24,20 @@ install_paru() {
     return 0
   fi
 
-  echo "Installing paru from AUR..."
+  echo "Building paru from source..."
 
-  local build_dir="$SRC_HOME/paru-bin"
+  local build_dir="$SRC_HOME/paru"
   rm -rf "$build_dir"
-  mkdir -p "$build_dir" || return 0
+  mkdir -p "$(dirname "$build_dir")" || return 0
 
-  if ! download_extract "https://aur.archlinux.org/cgit/aur.git/snapshot/paru-bin.tar.gz" "$build_dir" --strip-components=1; then
-    echo "Warning: Could not download paru-bin sources from AUR." >&2
+  if ! git clone https://aur.archlinux.org/paru.git "$build_dir"; then
+    echo "Warning: Could not clone paru from AUR." >&2
     rm -rf "$build_dir"
     return 0
   fi
 
   if ! (cd "$build_dir" && makepkg -si --noconfirm --needed); then
-    echo "Warning: Could not build paru from AUR." >&2
+    echo "Warning: Could not build paru from source." >&2
     rm -rf "$build_dir"
     return 0
   fi
