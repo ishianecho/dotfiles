@@ -1,0 +1,11 @@
+[Unit]
+Description=Compute XCURSOR_SIZE from monitor scale for XWayland apps
+After=graphical-session.target
+PartOf=graphical-session.target
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/xcursor-sync
+
+[Install]
+WantedBy=graphical-session.target

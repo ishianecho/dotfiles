@@ -2,13 +2,6 @@
 
 pkg_name="xray"
 
-is_arch_family() {
-  case "$system_release" in
-  arch | manjaro | endeavouros | garuda | artix | cachyos) return 0 ;;
-  *) return 1 ;;
-  esac
-}
-
 xray_release_asset() {
   case "${arch}-${os}" in
   amd64-linux) echo "Xray-linux-64.zip" ;;
@@ -27,8 +20,8 @@ install_xray() {
     return 0
   fi
 
-  if [ "$pkg_manager" = "pacman" ] && is_arch_family && command -v paru >/dev/null 2>&1; then
-    if paru -S --needed --noconfirm xray-bin; then
+  if [ "$pkg_manager" = "pacman" ] && is_arch_family; then
+    if try_package_manager xray-bin; then
       return 0
     fi
   elif [ "$pkg_manager" = "apt" ] || [ "$pkg_manager" = "dnf" ]; then

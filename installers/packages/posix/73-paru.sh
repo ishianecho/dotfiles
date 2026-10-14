@@ -2,13 +2,6 @@
 
 pkg_name="paru"
 
-is_arch_family() {
-  case "$system_release" in
-  arch | manjaro | endeavouros | garuda | artix | cachyos) return 0 ;;
-  *) return 1 ;;
-  esac
-}
-
 install_paru() {
   if [ "$os" != "linux" ] || ! is_arch_family; then
     echo "Skipping paru: only supported on Arch-based systems"

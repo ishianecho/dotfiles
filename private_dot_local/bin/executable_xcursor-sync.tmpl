@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+
+set -u
+
+base_size={{ .cursorBaseSize | default 24 }}
+conf_dir="${XDG_CONFIG_HOME:-$HOME/.config}/environment.d"
+conf_file="$conf_dir/70-xcursor-size.conf"
+
+current_scale() {
+  local scale=""
+  if command -v hyprctl >/dev/null 2>&1; then
+    scale="$(hyprctl -j monitors 2>/dev/null | jq -r '[.[].scale] | max // empty' 2>/dev/null)"
+  fi
+  if [ -z "$scale" ] && command -v swaymsg >/dev/null 2>&1; then
+    scale="$(swaymsg -r -t get_outputs 2>/dev/null | jq -r '[.[].scale | select(. > 0)] | max // empty' 2>/dev/null)"
+  fi
+  if [ -z "$scale" ] && command -v kscreen-doctor >/dev/null 2>&1; then
+    scale="$(kscreen-doctor -o 2>/dev/null | grep -oE 'Scale: *[0-9.]+' | grep -oE '[0-9.]+' | sort -g | tail -n 1)"
+  fi
+  if [ -z "$scale" ] && command -v gdbus >/dev/null 2>&1; then
+    scale="$(gdbus call --session --dest org.gnome.Mutter.DisplayConfig --object-path /org/gnome/Mutter/DisplayConfig --method org.gnome.Mutter.DisplayConfig.GetCurrentState 2>/dev/null |
+      grep -oE '\(-?[0-9]+, -?[0-9]+, [0-9]+(\.[0-9]+)?, uint32 [0-9]+, (true|false),' |
+      sed -E 's/^\(-?[0-9]+, -?[0-9]+, ([0-9]+(\.[0-9]+)?), uint32.*$/\1/' | sort -g | tail -n 1)"
+  fi
+  [ -n "$scale" ] && printf '%s\n' "$scale"
+}
+
+scale=""
+attempt=0
+while [ "$attempt" -lt 5 ]; do
+  scale="$(current_scale)"
+  [ -n "$scale" ] && break
+  attempt=$((attempt + 1))
+  sleep 2
+done
+: "${scale:=1}"
+
+size="$(awk -v b="$base_size" -v s="$scale" 'BEGIN { printf "%.0f", b * s }')"
+
+mkdir -p "$conf_dir"
+tmp="$(mktemp "$conf_dir/.70-xcursor-size.XXXXXX")"
+printf 'XCURSOR_SIZE=%s\n' "$size" >"$tmp"
+mv "$tmp" "$conf_file"
+
+export XCURSOR_SIZE="$size"
+
+if command -v systemctl >/dev/null 2>&1; then
+  systemctl --user set-environment XCURSOR_SIZE="$size"
+fi
+if command -v dbus-update-activation-environment >/dev/null 2>&1; then
+  dbus-update-activation-environment XCURSOR_SIZE
+fi
+
+echo "xcursor-sync: XCURSOR_SIZE=$size (base $base_size x scale $scale)"

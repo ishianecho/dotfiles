@@ -16,26 +16,31 @@
 {{- $installShell := promptBoolOnce . "installShell" "Install shell packages" true -}}
 {{- $installBuild := promptBoolOnce . "installBuild" "Install build packages" true -}}
 {{- $installRuntimes := promptBoolOnce . "installRuntimes" "Install runtime packages" true -}}
-{{- $installEditor := promptBoolOnce . "installEditor" "Install editor packages" true -}}
-{{- $installAi := promptBoolOnce . "installAi" "Install AI packages" true -}}
-{{- $installUtilities := promptBoolOnce . "installUtilities" "Install utility packages" true -}}
-{{- $installOperations := promptBoolOnce . "installOperations" "Install operation packages" true -}}
-{{- $installTerminal := promptBoolOnce . "installTerminal" "Install terminal packages" true -}}
+{{- $installEditor := promptBoolOnce . "installEditor" "Install editor packages" false -}}
+{{- $installAi := promptBoolOnce . "installAi" "Install AI packages" false -}}
+{{- $installUtilities := promptBoolOnce . "installUtilities" "Install utility packages" false -}}
+{{- $installOperations := promptBoolOnce . "installOperations" "Install operation packages" false -}}
+{{- $installTerminal := promptBoolOnce . "installTerminal" "Install terminal packages" false -}}
 {{- $installCompletions := promptBoolOnce . "installCompletions" "Install shell completions" true -}}
 {{- $installFonts := promptBoolOnce . "installFonts" "Install fonts" true -}}
 {{- $fontSize := promptIntOnce . "fontSize" "Font size for terminals and input method" 16 -}}
+{{- $cursorBaseSize := promptIntOnce . "cursorBaseSize" "Base cursor size before desktop scaling" 24 -}}
 {{- $transparency := promptStringOnce . "transparency" "Terminal transparency (0.0-1.0)" "0.8" -}}
 {{- $installInput := false -}}
 {{- if eq .chezmoi.os "linux" -}}
-{{-   $installInput = promptBoolOnce . "installInput" "Install input packages" true -}}
+{{-   $installInput = promptBoolOnce . "installInput" "Install input packages" false -}}
 {{- end -}}
 {{- $installGaming := false -}}
 {{- if eq .chezmoi.os "linux" -}}
-{{-   $installGaming = promptBoolOnce . "installGaming" "Install gaming packages" true -}}
+{{-   $installGaming = promptBoolOnce . "installGaming" "Install gaming packages" false -}}
+{{- end -}}
+{{- $installCommunication := false -}}
+{{- if eq .chezmoi.os "linux" -}}
+{{-   $installCommunication = promptBoolOnce . "installCommunication" "Install communication packages" false -}}
 {{- end -}}
 {{- $installDesktop := false -}}
 {{- if eq .chezmoi.os "linux" -}}
-{{-   $installDesktop = promptBoolOnce . "installDesktop" "Install desktop packages" true -}}
+{{-   $installDesktop = promptBoolOnce . "installDesktop" "Install desktop packages" false -}}
 {{- end -}}
 {{- $xrayTProxy := false -}}
 {{- if eq .chezmoi.os "linux" -}}
@@ -44,6 +49,7 @@
 
 [data]
 fontSize = {{ $fontSize }}
+cursorBaseSize = {{ $cursorBaseSize }}
 transparency = {{ $transparency | quote }}
 systemType = {{ $systemType | quote }}
 systemRelease = {{ $systemRelease | quote }}
@@ -59,5 +65,6 @@ installCompletions = {{ $installCompletions }}
 installFonts = {{ $installFonts }}
 installInput = {{ $installInput }}
 installGaming = {{ $installGaming }}
+installCommunication = {{ $installCommunication }}
 installDesktop = {{ $installDesktop }}
 xrayTProxy = {{ $xrayTProxy }}

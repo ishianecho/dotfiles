@@ -1,5 +1,12 @@
 #!/usr/bin/env bash
 
+is_arch_family() {
+  case "$system_release" in
+  arch | manjaro | endeavouros | garuda | artix | cachyos) return 0 ;;
+  *) return 1 ;;
+  esac
+}
+
 library_pattern() {
   case "$1" in
   libssl-dev) echo "ssl" ;;
@@ -93,7 +100,7 @@ pacman_package_name() {
 
 pacman_sync_done=false
 install_via_pacman() {
-  if [ "$pkg_manager" != "pacman" ] || [ "$has_sudo" != "true" ]; then
+  if [ "$pkg_manager" != "pacman" ]; then
     return 1
   fi
 
@@ -109,8 +116,20 @@ install_via_pacman() {
     pacman_sync_done=true
   fi
 
-  echo "Installing via pacman: ${packages[*]}"
-  sudo pacman -S "${sync_flags[@]}" --needed --noconfirm "${packages[@]}"
+  if [ "$has_sudo" = "true" ]; then
+    echo "Installing via pacman: ${packages[*]}"
+    if sudo pacman -S "${sync_flags[@]}" --needed --noconfirm "${packages[@]}"; then
+      return 0
+    fi
+  fi
+
+  if command -v paru >/dev/null 2>&1; then
+    echo "Installing via paru: ${packages[*]}"
+    paru -S "${sync_flags[@]}" --needed --noconfirm "${packages[@]}"
+    return $?
+  fi
+
+  return 1
 }
 
 brew_package_name() {
@@ -198,7 +217,7 @@ try_package_manager() {
     install_via_dnf "$@"
     return $?
   fi
-  if [ "$pkg_manager" = "pacman" ] && [ "$has_sudo" = "true" ]; then
+  if [ "$pkg_manager" = "pacman" ]; then
     install_via_pacman "$@"
     return $?
   fi

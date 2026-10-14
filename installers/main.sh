@@ -49,6 +49,9 @@ category_enabled() {
     gaming)
       [ "$install_gaming" = "true" ]
       ;;
+    communication)
+      [ "$install_communication" = "true" ]
+      ;;
     desktop)
       [ "$install_desktop" = "true" ]
       ;;
@@ -63,13 +66,14 @@ echo "==> Starting package installation"
 install_shell="${DOTS_INSTALL_SHELL:-true}"
 install_build="${DOTS_INSTALL_BUILD:-true}"
 install_runtimes="${DOTS_INSTALL_RUNTIMES:-true}"
-install_editor="${DOTS_INSTALL_EDITOR:-true}"
-install_ai="${DOTS_INSTALL_AI:-true}"
-install_utilities="${DOTS_INSTALL_UTILITIES:-true}"
-install_operations="${DOTS_INSTALL_OPERATIONS:-true}"
-install_terminal="${DOTS_INSTALL_TERMINAL:-true}"
+install_editor="${DOTS_INSTALL_EDITOR:-false}"
+install_ai="${DOTS_INSTALL_AI:-false}"
+install_utilities="${DOTS_INSTALL_UTILITIES:-false}"
+install_operations="${DOTS_INSTALL_OPERATIONS:-false}"
+install_terminal="${DOTS_INSTALL_TERMINAL:-false}"
 install_input="${DOTS_INSTALL_INPUT:-false}"
-install_gaming="${DOTS_INSTALL_GAMING:-true}"
+install_gaming="${DOTS_INSTALL_GAMING:-false}"
+install_communication="${DOTS_INSTALL_COMMUNICATION:-false}"
 install_desktop="${DOTS_INSTALL_DESKTOP:-false}"
 
 shopt -s nullglob
@@ -123,13 +127,16 @@ else
       g[0-9]-*)
         pkg_category=gaming
         ;;
+      c[0-9]-*)
+        pkg_category=communication
+        ;;
       d[0-9]-*)
         pkg_category=desktop
         ;;
     esac
 
     case "$pkg_category" in
-      shell | build | runtimes | editor | ai | utilities | operations | terminal | input | gaming | desktop)
+      shell | build | runtimes | editor | ai | utilities | operations | terminal | input | gaming | communication | desktop)
         if ! category_enabled "$pkg_category"; then
           echo "==> Skipping $pkg_basename"
           continue

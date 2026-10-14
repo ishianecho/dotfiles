@@ -65,8 +65,7 @@ case ":$PATH:" in
 *) export PATH="$MISE_DATA_DIR/shims:$PATH" ;;
 esac
 
-alias vi='nvim'
-alias vim='nvim'
+alias n='nvim'
 
 npx() {
   if [ -n "$1" ] && [ -x "./node_modules/.bin/$1" ]; then
