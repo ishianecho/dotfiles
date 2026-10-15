@@ -1,0 +1,8 @@
+--theme=ansi
+--style="numbers,changes,header,snip"
+--wrap=auto
+--tabs=4
+--map-syntax="*.ino:C++"
+--map-syntax=".ignore:Git Ignore"
+--map-syntax=".env:DotENV"
+--map-syntax="*.jenkinsfile:Groovy"
