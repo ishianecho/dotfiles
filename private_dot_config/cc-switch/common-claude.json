@@ -78,5 +78,17 @@
   "editorMode": "vim",
   "vimInsertModeRemaps": {
     "jj": "<Esc>"
+  },
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'i=$(cat); [ \"$(jq -r .stop_hook_active <<<\"$i\")\" = true ] && exit 0; curl -fsS --connect-timeout 2 --max-time 5 -H \"Title: CC finished: $(jq -r .cwd <<<\"$i\")\" -H \"Tags: robot\" -d \"$(jq -r \".last_assistant_message // \\\"task finished\\\"\" <<<\"$i\" | head -c 180)\" https://ntfy.ishian.me/claude-code' 2>/dev/null || true"
+          }
+        ]
+      }
+    ]
   }
 }
