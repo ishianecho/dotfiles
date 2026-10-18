@@ -85,7 +85,28 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash -c 'i=$(cat); [ \"$(jq -r .stop_hook_active <<<\"$i\")\" = true ] && exit 0; curl -fsS --connect-timeout 2 --max-time 5 -H \"Title: CC finished: $(jq -r .cwd <<<\"$i\")\" -H \"Tags: robot\" -d \"$(jq -r \".last_assistant_message // \\\"task finished\\\"\" <<<\"$i\" | head -c 180)\" https://ntfy.ishian.me/claude-code' 2>/dev/null || true"
+            "command": "bash -c 'i=$(cat); [ \"$(jq -r .stop_hook_active <<<\"$i\")\" = true ] && exit 0; q=$(jq -r \"select(.type==\\\"user\\\" and (.isMeta|not)) | .message.content | select(type==\\\"string\\\")\" \"$(jq -r .transcript_path <<<\"$i\")\" 2>/dev/null | tail -1 | tr \"\\n\" \" \" | jq -rR \".[0:120]\"); curl -fsS --connect-timeout 2 --max-time 5 -H \"Title: cc finished: ${q:-$(jq -r .cwd <<<\"$i\")}\" -H \"Tags: robot\" -d \"$(jq -r .cwd <<<\"$i\")\" https://ntfy.ishian.me/claude-code' 2>/dev/null || true"
+          }
+        ]
+      }
+    ],
+    "Notification": [
+      {
+        "matcher": "permission_prompt|idle_prompt|agent_needs_input",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'i=$(cat); q=$(jq -r \"select(.type==\\\"assistant\\\") | .message.content[]? | select(.type==\\\"tool_use\\\" and .name==\\\"AskUserQuestion\\\") | .input.questions[0].question\" \"$(jq -r .transcript_path <<<\"$i\")\" 2>/dev/null | tail -1 | tr \"\\n\" \" \" | jq -rR \".[0:120]\"); [ -n \"$q\" ] || q=$(jq -r \".message // \\\"input needed\\\"\" <<<\"$i\"); curl -fsS --connect-timeout 2 --max-time 5 -H \"Title: cc asks: $q\" -H \"Tags: speech_balloon\" -d \"$(jq -r .cwd <<<\"$i\")\" https://ntfy.ishian.me/claude-code' 2>/dev/null || true"
+          }
+        ]
+      }
+    ],
+    "StopFailure": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'i=$(cat); curl -fsS --connect-timeout 2 --max-time 5 -H \"Title: cc error: $(jq -r \".error_details // .last_assistant_message // .error\" <<<\"$i\" | jq -rR \".[0:120]\")\" -H \"Tags: warning\" -d \"$(jq -r .cwd <<<\"$i\")\" https://ntfy.ishian.me/claude-code' 2>/dev/null || true"
           }
         ]
       }
