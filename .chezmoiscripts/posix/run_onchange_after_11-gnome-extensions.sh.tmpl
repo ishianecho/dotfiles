@@ -6,7 +6,9 @@ command -v gsettings >/dev/null 2>&1 || exit 0
 command -v dconf >/dev/null 2>&1 || exit 0
 
 gsettings set org.gnome.shell enabled-extensions \
-  "['just-perfection-desktop@just-perfection', 'kimpanel@kde.org']"
+  "['gpu-screen-recorder@dec05eba.com', 'just-perfection-desktop@just-perfection', 'kimpanel@kde.org', 'appindicatorsupport@rgcjonas.gmail.com']"
+
+gsettings set org.gnome.shell disable-user-extensions false
 
 dconf write /org/gnome/shell/extensions/just-perfection/notification-banner-position 2
 dconf write /org/gnome/shell/extensions/kimpanel/font "'LXGW WenKai Mono {{ .fontSize }}'"

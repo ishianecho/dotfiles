@@ -39,3 +39,4 @@ install_extension() {
 
 install_extension "just-perfection-desktop@just-perfection"
 install_extension "kimpanel@kde.org"
+install_extension "appindicatorsupport@rgcjonas.gmail.com"

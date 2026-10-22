@@ -3,6 +3,12 @@
 set -u
 
 base_size={{ .cursorBaseSize | default 24 }}
+theme=""
+if command -v gsettings >/dev/null 2>&1; then
+  gs="$(gsettings get org.gnome.desktop.interface cursor-size 2>/dev/null | tr -cd 0-9)"
+  [ -n "$gs" ] && base_size="$gs"
+  theme="$(gsettings get org.gnome.desktop.interface cursor-theme 2>/dev/null | tr -d "'\"")"
+fi
 conf_dir="${XDG_CONFIG_HOME:-$HOME/.config}/environment.d"
 conf_file="$conf_dir/70-xcursor-size.conf"
 
@@ -40,15 +46,17 @@ size="$(awk -v b="$base_size" -v s="$scale" 'BEGIN { printf "%.0f", b * s }')"
 mkdir -p "$conf_dir"
 tmp="$(mktemp "$conf_dir/.70-xcursor-size.XXXXXX")"
 printf 'XCURSOR_SIZE=%s\n' "$size" >"$tmp"
+[ -n "$theme" ] && printf 'XCURSOR_THEME=%s\n' "$theme" >>"$tmp"
 mv "$tmp" "$conf_file"
 
 export XCURSOR_SIZE="$size"
+[ -n "$theme" ] && export XCURSOR_THEME="$theme"
 
 if command -v systemctl >/dev/null 2>&1; then
-  systemctl --user set-environment XCURSOR_SIZE="$size"
+  systemctl --user set-environment XCURSOR_SIZE="$size" ${theme:+XCURSOR_THEME="$theme"}
 fi
 if command -v dbus-update-activation-environment >/dev/null 2>&1; then
-  dbus-update-activation-environment XCURSOR_SIZE
+  dbus-update-activation-environment XCURSOR_SIZE ${theme:+XCURSOR_THEME}
 fi
 
-echo "xcursor-sync: XCURSOR_SIZE=$size (base $base_size x scale $scale)"
+echo "xcursor-sync: XCURSOR_SIZE=$size (base $base_size x scale $scale) XCURSOR_THEME=${theme:-unchanged}"
