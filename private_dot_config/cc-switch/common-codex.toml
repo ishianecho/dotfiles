@@ -9,6 +9,9 @@ command = "serena"
 args = ["start-mcp-server", "--context=codex", "--project-from-cwd"]
 startup_timeout_sec = 15
 
+[mcp_servers.cloudflare]
+url = "https://mcp.cloudflare.com/mcp"
+
 [tui]
 vim_mode_default = true
 screen_reader_detection_done = true
