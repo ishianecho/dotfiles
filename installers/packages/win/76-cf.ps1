@@ -8,7 +8,7 @@ if (-not (Test-Installed "cf") -and -not (Test-Installed "cloudflare")) {
         return
     }
 
-    pnpm add -g cf
+    pnpm add -g --allow-build=workerd cf
     if ($LASTEXITCODE -ne 0) {
         throw "pnpm add cf failed"
     }

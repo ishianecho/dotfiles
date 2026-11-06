@@ -13,7 +13,7 @@ install_cf() {
   fi
 
   echo "Installing cf (Cloudflare CLI) via pnpm..."
-  pnpm add -g cf || return 1
+  pnpm add -g --allow-build=workerd cf || return 1
 }
 
 install_cf

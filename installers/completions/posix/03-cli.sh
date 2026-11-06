@@ -4,6 +4,7 @@ completion_command() {
   case "$1" in
   gh) echo "completion -s" ;;
   uv) echo "generate-shell-completion" ;;
+  cf) echo "complete" ;;
   *) echo "completion" ;;
   esac
 }
@@ -18,7 +19,7 @@ generate_cli_completions() {
   fi
 
   local tool args tmp
-  for tool in buf chezmoi codex gh kubectl mise pnpm uv; do
+  for tool in buf cf chezmoi codex gh kubectl mise pnpm uv; do
     if ! command -v "$tool" >/dev/null 2>&1; then
       continue
     fi
