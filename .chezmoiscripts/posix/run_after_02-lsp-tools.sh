@@ -28,6 +28,7 @@ specs=(
   "gopls	go:golang.org/x/tools/gopls@0.24.0"
   "jdtls	jdtls"
   "typescript-language-server	npm:typescript-language-server@6.0.3"
+  "tsc	npm:typescript@6.0.3"
   "lua-language-server	lua-language-server@3.19.2"
   "buf	buf@1.75.0"
   "ty	ty@0.0.97"
@@ -69,6 +70,21 @@ install_lombok() {
   curl -fL -o "$jdtls_dir/lombok.jar.tmp.$$" \
     "https://repo1.maven.org/maven2/org/projectlombok/lombok/$lombok_version/lombok-$lombok_version.jar" \
     && mv "$jdtls_dir/lombok.jar.tmp.$$" "$jdtls_dir/lombok.jar"
+}
+
+link_ts_ls_typescript() {
+  local ts_dir
+  ts_dir="$(ls -d "$HOME"/.local/share/mise/installs/npm-typescript/*/node_modules/typescript 2>/dev/null | sort -V | tail -1 || true)"
+  if [ -z "$ts_dir" ] || [ ! -f "$ts_dir/lib/tsserver.js" ]; then
+    return 0
+  fi
+  local dir
+  for dir in "$HOME"/.local/share/mise/installs/npm-typescript-language-server/*; do
+    [ -d "$dir/node_modules" ] || continue
+    if [ "$(readlink "$dir/node_modules/typescript" 2>/dev/null)" != "$ts_dir" ]; then
+      ln -sfn "$ts_dir" "$dir/node_modules/typescript"
+    fi
+  done
 }
 
 install_jdtls() {
@@ -228,6 +244,7 @@ for entry in "${specs[@]}"; do
 done
 
 install_lombok || true
+link_ts_ls_typescript || true
 
 count=${#missing_specs[@]}
 if [ "$count" -eq 0 ]; then
@@ -288,3 +305,5 @@ if ! install_selected "${chosen[@]}"; then
   echo "some installs failed, re-run chezmoi apply to retry" >&2
   exit 1
 fi
+
+link_ts_ls_typescript || true
