@@ -1,7 +1,4 @@
-{{- $masonBin := joinPath .chezmoi.homeDir ".local/share/nvim/mason/bin" -}}
-{{- if eq .chezmoi.os "windows" -}}
-{{-   $masonBin = joinPath .chezmoi.homeDir "AppData/Local/nvim-data/mason/bin" -}}
-{{- end -}}
+{{- $shims := joinPath (joinPath .chezmoi.homeDir ".local/share") "mise/shims" -}}
 {{- $serenaData := joinPath (joinPath .chezmoi.homeDir ".local/share") "serena/projects" -}}
 # advanced configuration option allowing to configure language server-specific options.
 # Maps the language key to the options.
@@ -9,33 +6,33 @@
 # No documentation on options means no options are available.
 ls_specific_settings:
   bash:
-    ls_path: "{{ $masonBin }}/bash-language-server"
+    ls_path: {{ or (lookPath "bash-language-server") (joinPath $shims "bash-language-server") | quote }}
   cpp:
-    ls_path: "{{ $masonBin }}/clangd"
+    ls_path: {{ or (lookPath "clangd") (joinPath $shims "clangd") | quote }}
   go:
-    ls_path: "{{ $masonBin }}/gopls"
+    ls_path: {{ or (lookPath "gopls") (joinPath $shims "gopls") | quote }}
   groovy:
-    ls_path: "{{ $masonBin }}/groovy-language-server"
+    ls_path: {{ or (lookPath "groovy-language-server") (joinPath $shims "groovy-language-server") | quote }}
   java:
-    ls_path: "{{ $masonBin }}/jdtls"
+    ls_path: {{ or (lookPath "jdtls") (joinPath $shims "jdtls") | quote }}
   json:
-    ls_path: "{{ $masonBin }}/vscode-json-language-server"
+    ls_path: {{ or (lookPath "vscode-json-language-server") (joinPath $shims "vscode-json-language-server") | quote }}
   latex:
-    ls_path: "{{ $masonBin }}/texlab"
+    ls_path: {{ or (lookPath "texlab") (joinPath $shims "texlab") | quote }}
   lua:
-    ls_path: "{{ $masonBin }}/lua-language-server"
+    ls_path: {{ or (lookPath "lua-language-server") (joinPath $shims "lua-language-server") | quote }}
   markdown:
-    ls_path: "{{ $masonBin }}/marksman"
+    ls_path: {{ or (lookPath "marksman") (joinPath $shims "marksman") | quote }}
   rust:
-    ls_path: "{{ $masonBin }}/rust-analyzer"
+    ls_path: {{ or (lookPath "rust-analyzer") (joinPath $shims "rust-analyzer") | quote }}
   toml:
-    ls_path: "{{ $masonBin }}/taplo"
+    ls_path: {{ or (lookPath "taplo") (joinPath $shims "taplo") | quote }}
   typescript:
-    ls_path: "{{ $masonBin }}/typescript-language-server"
+    ls_path: {{ or (lookPath "typescript-language-server") (joinPath $shims "typescript-language-server") | quote }}
   vue:
-    ls_path: "{{ $masonBin }}/vue-language-server"
+    ls_path: {{ or (lookPath "vue-language-server") (joinPath $shims "vue-language-server") | quote }}
   yaml:
-    ls_path: "{{ $masonBin }}/yaml-language-server"
+    ls_path: {{ or (lookPath "yaml-language-server") (joinPath $shims "yaml-language-server") | quote }}
 # template for the location of the per-project .serena data folder (memories, caches, etc.).
 # Supports the following placeholders:
 #   $projectDir         - the absolute path to the project root directory

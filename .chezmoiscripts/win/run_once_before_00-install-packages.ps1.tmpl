@@ -1,14 +1,5 @@
 {{ if eq .chezmoi.os "windows" -}}
 $ErrorActionPreference = "Stop"
 
-$env:DOTS_INSTALL_SHELL = '{{ if hasKey . "installShell" }}{{ .installShell }}{{ else }}true{{ end }}'
-$env:DOTS_INSTALL_BUILD = '{{ if hasKey . "installBuild" }}{{ .installBuild }}{{ else }}true{{ end }}'
-$env:DOTS_INSTALL_RUNTIMES = '{{ if hasKey . "installRuntimes" }}{{ .installRuntimes }}{{ else }}true{{ end }}'
-$env:DOTS_INSTALL_EDITOR = '{{ if hasKey . "installEditor" }}{{ .installEditor }}{{ else }}true{{ end }}'
-$env:DOTS_INSTALL_AI = '{{ if hasKey . "installAi" }}{{ .installAi }}{{ else }}true{{ end }}'
-$env:DOTS_INSTALL_UTILITIES = '{{ if hasKey . "installUtilities" }}{{ .installUtilities }}{{ else }}true{{ end }}'
-$env:DOTS_INSTALL_OPERATIONS = '{{ if hasKey . "installOperations" }}{{ .installOperations }}{{ else }}true{{ end }}'
-$env:DOTS_INSTALL_TERMINAL = '{{ if hasKey . "installTerminal" }}{{ .installTerminal }}{{ else }}true{{ end }}'
-
 & "{{ .chezmoi.sourceDir }}/installers/main.ps1"
 {{- end }}

@@ -61,6 +61,16 @@ curl_download() {
   curl -fL --progress-bar "$@"
 }
 
+pkg_lock_file="${XDG_RUNTIME_DIR:-${TMPDIR:-/tmp}}/dots-pkg-lock"
+
+pkg_lock() {
+  if command -v flock >/dev/null 2>&1; then
+    flock "$pkg_lock_file" "$@"
+  else
+    "$@"
+  fi
+}
+
 apt_update_done=false
 install_via_apt() {
   if [ "$pkg_manager" != "apt" ] || [ "$has_sudo" != "true" ]; then
@@ -69,10 +79,10 @@ install_via_apt() {
 
   echo "Installing via apt: $*"
   if [ "$apt_update_done" != "true" ]; then
-    sudo apt-get update || return 1
+    pkg_lock sudo apt-get update || return 1
     apt_update_done=true
   fi
-  sudo apt-get install -y "$@"
+  pkg_lock sudo apt-get install -y "$@"
 }
 
 pacman_package_name() {
@@ -118,14 +128,14 @@ install_via_pacman() {
 
   if [ "$has_sudo" = "true" ]; then
     echo "Installing via pacman: ${packages[*]}"
-    if sudo pacman -S "${sync_flags[@]}" --needed --noconfirm "${packages[@]}"; then
+    if pkg_lock sudo pacman -S "${sync_flags[@]}" --needed --noconfirm "${packages[@]}"; then
       return 0
     fi
   fi
 
   if command -v paru >/dev/null 2>&1; then
     echo "Installing via paru: ${packages[*]}"
-    paru -S "${sync_flags[@]}" --needed --noconfirm "${packages[@]}"
+    pkg_lock paru -S "${sync_flags[@]}" --needed --noconfirm "${packages[@]}"
     return $?
   fi
 
@@ -169,7 +179,7 @@ install_via_brew() {
   fi
 
   echo "Installing via brew: ${packages[*]}"
-  brew install "${packages[@]}"
+  pkg_lock brew install "${packages[@]}"
 }
 
 dnf_package_name() {
@@ -205,7 +215,7 @@ install_via_dnf() {
   done
 
   echo "Installing via dnf: ${packages[*]}"
-  sudo dnf install -y "${packages[@]}"
+  pkg_lock sudo dnf install -y "${packages[@]}"
 }
 
 try_package_manager() {
@@ -367,4 +377,122 @@ install_custom() {
   echo "Installing ${name} ${version}..."
 
   "$install_fn"
+}
+
+multiselect() {
+  local options=("$@")
+  local total=${#options[@]}
+  [ "$total" -eq 0 ] && return 1
+
+  if command -v fzf >/dev/null 2>&1; then
+    local sel_dir line
+    sel_dir="$(mktemp -d)"
+    if [ -n "${KITTY_WINDOW_ID:-}" ]; then
+      printf '\033]1337;SetUserVar=ZSH_SELECTOR_MODE=Mg==\007' >&2
+    fi
+    printf '%s\n' "${options[@]}" | fzf \
+      --multi \
+      --header='Tab: toggle   Ctrl-A: select all   Ctrl-D: deselect   Enter: confirm   Esc: cancel' \
+      --bind='ctrl-a:select-all,ctrl-d:deselect-all,ctrl-j:down,ctrl-k:up' \
+      --listen \
+      --bind="enter:execute-silent(curl -s \"http://127.0.0.1:\$FZF_PORT?limit=1000\" | jq -r '.selected[].text' >'$sel_dir/sel'; : >'$sel_dir/ok')+abort" \
+      >/dev/null 2>&1 || true
+    if [ -n "${KITTY_WINDOW_ID:-}" ]; then
+      printf '\033]1337;SetUserVar=ZSH_SELECTOR_MODE\007' >&2
+    fi
+    if [ -f "$sel_dir/ok" ]; then
+      while IFS= read -r line; do
+        [ -n "$line" ] && printf '%s\n' "$line"
+      done <"$sel_dir/sel"
+      rm -rf "$sel_dir"
+      return 0
+    fi
+    rm -rf "$sel_dir"
+    return 1
+  fi
+
+  local cursor=0 top=0
+  local viewport=20
+  local -a state=()
+  local i key seq all
+
+  for ((i = 0; i < total; i++)); do state[i]=0; done
+  if [ -n "${LINES:-}" ] && [ "$LINES" -gt 8 ]; then
+    viewport=$((LINES - 6))
+  fi
+
+  printf '\e[?25l' >&2
+  trap 'printf "\e[?25h\e[0m" >&2; exit 130' INT
+  trap 'printf "\e[?25h\e[0m" >&2; exit 143' TERM
+  while true; do
+    printf '\e[H\e[2J' >&2
+    echo "  ↑/↓ move   Space toggle   a toggle all   Enter install selection   q run default (all enabled)" >&2
+    echo "" >&2
+    [ "$top" -gt 0 ] && echo "  ↑ more" >&2 || echo "" >&2
+    for ((i = top; i < top + viewport && i < total; i++)); do
+      if [ "$i" -eq "$cursor" ]; then
+        printf ' \e[7m' >&2
+      else
+        printf ' ' >&2
+      fi
+      if [ "${state[$i]}" -eq 1 ]; then
+        printf '[x] %s\e[0m\n' "${options[$i]}" >&2
+      else
+        printf '[ ] %s\e[0m\n' "${options[$i]}" >&2
+      fi
+    done
+    [ $((top + viewport)) -lt "$total" ] && echo "  ↓ more" >&2 || echo "" >&2
+
+    IFS= read -rsn1 key
+    case "$key" in
+      $'\e')
+        seq=""
+        IFS= read -rsn2 -t 0.05 seq || true
+        case "$seq" in
+          '[A')
+            [ "$cursor" -gt 0 ] && cursor=$((cursor - 1))
+            [ "$cursor" -lt "$top" ] && top=$cursor
+            ;;
+          '[B')
+            [ "$cursor" -lt $((total - 1)) ] && cursor=$((cursor + 1))
+            [ "$cursor" -ge $((top + viewport)) ] && top=$((cursor - viewport + 1))
+            ;;
+          *)
+            printf '\e[?25h\e[0m\n' >&2
+            return 1
+            ;;
+        esac
+        ;;
+      ' ')
+        state[$cursor]=$((1 - state[cursor]))
+        ;;
+      a | A)
+        all=1
+        for ((i = 0; i < total; i++)); do
+          [ "${state[$i]}" -eq 0 ] && all=0
+        done
+        all=$((1 - all))
+        for ((i = 0; i < total; i++)); do state[$i]=$all; done
+        ;;
+      j | J)
+        [ "$cursor" -lt $((total - 1)) ] && cursor=$((cursor + 1))
+        [ "$cursor" -ge $((top + viewport)) ] && top=$((cursor - viewport + 1))
+        ;;
+      k | K)
+        [ "$cursor" -gt 0 ] && cursor=$((cursor - 1))
+        [ "$cursor" -lt "$top" ] && top=$cursor
+        ;;
+      '')
+        printf '\e[?25h\e[0m\n' >&2
+        for ((i = 0; i < total; i++)); do
+          [ "${state[$i]}" -eq 1 ] && printf '%s\n' "${options[$i]}"
+        done
+        return 0
+        ;;
+      q | Q)
+        printf '\e[?25h\e[0m\n' >&2
+        return 1
+        ;;
+    esac
+  done
 }

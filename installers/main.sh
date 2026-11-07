@@ -8,6 +8,9 @@ cleanup_temp_files() {
   rm -f /tmp/*.tmp.$$
   rm -rf /tmp/*-*.$$
   rm -f "$HOME/.local/bin/"*.tmp.$$
+  if [ -n "${jobs_tmp:-}" ]; then
+    rm -rf "$jobs_tmp"
+  fi
 }
 
 trap cleanup_temp_files EXIT
@@ -16,6 +19,47 @@ trap 'exit 143' TERM
 
 source "$SCRIPT_DIR/lib/posix/env.sh"
 source "$SCRIPT_DIR/lib/posix/helpers.sh"
+
+pkg_category_of() {
+  case "$1" in
+    0[0-9]-*)
+      echo "shell"
+      ;;
+    1[0-9]-* | 2[0-9]-*)
+      echo "build"
+      ;;
+    3[0-9]-*)
+      echo "runtimes"
+      ;;
+    4[0-9]-*)
+      echo "editor"
+      ;;
+    5[0-9]-*)
+      echo "ai"
+      ;;
+    6[0-9]-*)
+      echo "utilities"
+      ;;
+    7[0-9]-*)
+      echo "operations"
+      ;;
+    8[0-9]-*)
+      echo "terminal"
+      ;;
+    9[0-9]-*)
+      echo "input"
+      ;;
+    g[0-9]-*)
+      echo "gaming"
+      ;;
+    c[0-9]-*)
+      echo "communication"
+      ;;
+    d[0-9]-*)
+      echo "desktop"
+      ;;
+  esac
+}
 
 category_enabled() {
   case "$1" in
@@ -90,64 +134,127 @@ else
 
   echo "==> Found ${#sorted_packages[@]} packages"
 
+  failed=0
+  jobs_tmp="$(mktemp -d)"
+  job_names=()
+  job_pids=()
+  job_logs=()
+  job_marks=()
+  if [ -t 1 ]; then
+    tty_mode=true
+  else
+    tty_mode=false
+  fi
+
+  pick_mode="all"
+  selected_packages=" "
+  if [ "${DOTS_NO_PICKER:-}" != "1" ] && [ -t 0 ] && [ -t 1 ]; then
+    picker_options=()
+    for pkg_file in "${sorted_packages[@]}"; do
+      pkg_basename=$(basename "$pkg_file" .sh)
+      [ "$pkg_basename" = "00-init" ] && continue
+      pkg_category="$(pkg_category_of "$pkg_basename")"
+      picker_options+=("$pkg_basename (${pkg_category})")
+    done
+    if [ ${#picker_options[@]} -gt 0 ]; then
+      echo "==> Select packages to install"
+      if picker_result="$(multiselect "${picker_options[@]}")"; then
+        pick_mode="selection"
+        selected_packages=" $(printf '%s\n' "$picker_result" | sed 's/ (.*$//' | tr '\n' ' ') "
+        picked_count=$(printf '%s\n' "$picker_result" | grep -c . || true)
+        echo "==> Selected ${picked_count} package(s)"
+      else
+        echo "==> Picker dismissed, installing all enabled categories"
+      fi
+    fi
+  fi
+
   for pkg_file in "${sorted_packages[@]}"; do
     pkg_basename=$(basename "$pkg_file" .sh)
     if [ "$pkg_basename" = "00-init" ]; then
       continue
     fi
-    pkg_category=""
-    case "$pkg_basename" in
-      0[0-9]-*)
-        pkg_category=shell
-        ;;
-      1[0-9]-* | 2[0-9]-*)
-        pkg_category=build
-        ;;
-      3[0-9]-*)
-        pkg_category=runtimes
-        ;;
-      4[0-9]-*)
-        pkg_category=editor
-        ;;
-      5[0-9]-*)
-        pkg_category=ai
-        ;;
-      6[0-9]-*)
-        pkg_category=utilities
-        ;;
-      7[0-9]-*)
-        pkg_category=operations
-        ;;
-      8[0-9]-*)
-        pkg_category=terminal
-        ;;
-      9[0-9]-*)
-        pkg_category=input
-        ;;
-      g[0-9]-*)
-        pkg_category=gaming
-        ;;
-      c[0-9]-*)
-        pkg_category=communication
-        ;;
-      d[0-9]-*)
-        pkg_category=desktop
-        ;;
-    esac
+    if [ "$pick_mode" = "selection" ]; then
+      case "$selected_packages" in
+        *" $pkg_basename "*) ;;
+        *) continue ;;
+      esac
+    else
+      pkg_category="$(pkg_category_of "$pkg_basename")"
 
-    case "$pkg_category" in
-      shell | build | runtimes | editor | ai | utilities | operations | terminal | input | gaming | communication | desktop)
-        if ! category_enabled "$pkg_category"; then
-          echo "==> Skipping $pkg_basename"
-          continue
-        fi
-        ;;
-    esac
+      case "$pkg_category" in
+        shell | build | runtimes | editor | ai | utilities | operations | terminal | input | gaming | communication | desktop)
+          if ! category_enabled "$pkg_category"; then
+            [ "$tty_mode" = false ] && echo "==> Skipping $pkg_basename"
+            continue
+          fi
+          ;;
+      esac
+    fi
 
-    echo "==> Processing: $pkg_basename"
-
-    source "$pkg_file"
+    [ "$tty_mode" = false ] && echo "==> Processing: $pkg_basename"
+    job_idx=${#job_names[@]}
+    job_names+=("$pkg_basename")
+    job_logs+=("$jobs_tmp/$job_idx.log")
+    job_marks+=("$jobs_tmp/$job_idx.mark")
+    (
+      rc=0
+      (
+        source "$pkg_file"
+      ) || rc=$?
+      : >"$jobs_tmp/$job_idx.mark"
+      exit "$rc"
+    ) >"$jobs_tmp/$job_idx.log" 2>&1 </dev/null &
+    job_pids+=($!)
   done
+
+  total_jobs=${#job_pids[@]}
+  if [ "$total_jobs" -gt 0 ]; then
+    if [ "$tty_mode" = true ]; then
+      printf '\e[?25l'
+      trap 'printf "\e[?25h" >&2; exit 130' INT
+      trap 'printf "\e[?25h" >&2; exit 143' TERM
+      echo "==> Installing $total_jobs package(s)"
+      job_shown=()
+      finished=0
+      while [ "$finished" -lt "$total_jobs" ]; do
+        new_line=true
+        for i in "${!job_pids[@]}"; do
+          [ -n "${job_shown[$i]:-}" ] && continue
+          [ -f "${job_marks[$i]}" ] || continue
+          if [ "$new_line" = true ]; then
+            printf '\r\e[K'
+            new_line=false
+          fi
+          job_shown[$i]=1
+          finished=$((finished + 1))
+          if wait "${job_pids[$i]}"; then
+            printf '  ✔ %s\n' "${job_names[$i]}"
+          else
+            failed=1
+            printf '  ✗ %s\n' "${job_names[$i]}"
+            tail -n 20 "${job_logs[$i]}" | sed 's/^/    /'
+          fi
+        done
+        printf '\r\e[K  … %d/%d' "$finished" "$total_jobs"
+        sleep 0.15
+      done
+      printf '\r\e[K'
+      printf '\e[?25h'
+    else
+      for i in "${!job_pids[@]}"; do
+        if wait "${job_pids[$i]}"; then
+          echo "[ok] ${job_names[$i]}"
+        else
+          failed=1
+          echo "[fail] ${job_names[$i]}"
+          tail -n 20 "${job_logs[$i]}" | sed 's/^/    /'
+        fi
+      done
+    fi
+  fi
+  rm -rf "$jobs_tmp"
+  jobs_tmp=""
 fi
 
 install_completions="${DOTS_INSTALL_COMPLETIONS:-true}"
@@ -191,3 +298,4 @@ fi
 
 echo ""
 echo "==> Installation complete!"
+[ "$failed" -eq 0 ] || exit 1

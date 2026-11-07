@@ -14,15 +14,20 @@ if [ -f /etc/bashrc ]; then
 	. /etc/bashrc
 fi
 
-shopt -s cdspell
-
 . "$HOME/.config/shell/env"
 . "$XDG_CONFIG_HOME/env"
 
 export EDITOR='nvim'
 export VISUAL='nvim'
 
-alias n=nvim
+. "$XDG_CONFIG_HOME/bash/opt.sh"
+. "$XDG_CONFIG_HOME/bash/alias.sh"
+. "$XDG_CONFIG_HOME/bash/envrc.sh"
+. "$XDG_CONFIG_HOME/bash/completion.sh"
+. "$XDG_CONFIG_HOME/bash/theme.sh"
+
+. "$XDG_CONFIG_HOME/bash/keybinds.sh"
+. "$XDG_CONFIG_HOME/bash/kitty.sh"
 
 npx() {
   if [ -n "$1" ] && [ -x "./node_modules/.bin/$1" ]; then
@@ -32,10 +37,6 @@ npx() {
   fi
 }
 [ -f "$CARGO_HOME/env" ] && . "$CARGO_HOME/env"
-
-[ -f "$XDG_CONFIG_HOME/fzf/fzf.bash" ] && source "$XDG_CONFIG_HOME/fzf/fzf.bash"
-
-. "$XDG_CONFIG_HOME/shell/completions"
 
 {{ if ne .chezmoi.os "windows" -}}
 mise_path="$(command -v mise 2>/dev/null || true)"
