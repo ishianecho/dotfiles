@@ -72,16 +72,25 @@ install_lombok() {
 }
 
 install_jdtls() {
-  if command -v jdtls >/dev/null 2>&1; then
+  local dest="$HOME/.local/share/jdtls"
+  local dir="$dest/jdt-language-server-$jdtls_version"
+  if [ -x "$dir/bin/jdtls" ] && ls "$dir/plugins"/org.eclipse.equinox.launcher_*.jar >/dev/null 2>&1; then
+    mkdir -p "$HOME/.local/bin"
+    ln -sf "$dir/bin/jdtls" "$HOME/.local/bin/jdtls"
     return 0
   fi
   echo "Installing jdtls $jdtls_version ..."
-  local dest="$HOME/.local/share/jdtls"
-  local dir="$dest/jdt-language-server-$jdtls_version"
-  if [ ! -x "$dir/bin/jdtls" ]; then
-    mkdir -p "$dir"
-    curl -fL "https://download.eclipse.org/jdtls/milestones/$jdtls_version/jdt-language-server-$jdtls_version-$jdtls_build.tar.gz" \
-      | tar -xz -C "$dir"
+  rm -rf "$dir"
+  mkdir -p "$dest"
+  local tmp
+  tmp=$(mktemp -d "$dest/.tmp-jdtls-XXXXXX")
+  if ! { curl -fL "https://download.eclipse.org/jdtls/milestones/$jdtls_version/jdt-language-server-$jdtls_version-$jdtls_build.tar.gz" \
+      | tar -xz -C "$tmp" \
+      && ls "$tmp/plugins"/org.eclipse.equinox.launcher_*.jar >/dev/null 2>&1 \
+      && mv "$tmp" "$dir"; }; then
+    rm -rf "$tmp"
+    echo "jdtls install failed" >&2
+    return 1
   fi
   mkdir -p "$HOME/.local/bin"
   ln -sf "$dir/bin/jdtls" "$HOME/.local/bin/jdtls"
