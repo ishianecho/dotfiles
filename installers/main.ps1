@@ -33,6 +33,7 @@ $installAi = Get-InstallOption -Name "DOTS_INSTALL_AI"
 $installUtilities = Get-InstallOption -Name "DOTS_INSTALL_UTILITIES"
 $installOperations = Get-InstallOption -Name "DOTS_INSTALL_OPERATIONS"
 $installTerminal = Get-InstallOption -Name "DOTS_INSTALL_TERMINAL"
+$installEntertainment = Get-InstallOption -Name "DOTS_INSTALL_ENTERTAINMENT" -Default $false
 $installMsys2 = $installShell -or
     $installBuild -or
     $installUtilities -or
@@ -118,6 +119,7 @@ foreach ($package in $packages) {
         "^6[0-9]-" { "utilities" }
         "^7[0-9]-" { "operations" }
         "^8[0-9]-" { "terminal" }
+        "^e[0-9]-" { "entertainment" }
         default { "" }
     }
     if (-not $category) {
@@ -153,7 +155,10 @@ foreach ($package in $packages) {
             $installOperations 
         }
         "terminal" {
-            $installTerminal 
+            $installTerminal
+        }
+        "entertainment" {
+            $installEntertainment
         }
         default {
             throw "Unknown install category: $category" 

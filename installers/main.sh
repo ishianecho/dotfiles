@@ -20,6 +20,21 @@ trap 'exit 143' TERM
 source "$SCRIPT_DIR/lib/posix/env.sh"
 source "$SCRIPT_DIR/lib/posix/helpers.sh"
 
+pkg_category_short() {
+  case "$1" in
+  shell) echo "sh" ;;
+  runtimes) echo "run" ;;
+  editor) echo "edit" ;;
+  utilities) echo "util" ;;
+  operations) echo "ops" ;;
+  terminal) echo "term" ;;
+  entertainment) echo "ent" ;;
+  communication) echo "comm" ;;
+  desktop) echo "desk" ;;
+  *) echo "$1" ;;
+  esac
+}
+
 pkg_category_of() {
   case "$1" in
     0[0-9]-*)
@@ -49,8 +64,8 @@ pkg_category_of() {
     9[0-9]-*)
       echo "input"
       ;;
-    g[0-9]-*)
-      echo "gaming"
+    e[0-9]-*)
+      echo "entertainment"
       ;;
     c[0-9]-*)
       echo "communication"
@@ -90,8 +105,8 @@ category_enabled() {
     input)
       [ "$install_input" = "true" ]
       ;;
-    gaming)
-      [ "$install_gaming" = "true" ]
+    entertainment)
+      [ "$install_entertainment" = "true" ]
       ;;
     communication)
       [ "$install_communication" = "true" ]
@@ -116,7 +131,7 @@ install_utilities="${DOTS_INSTALL_UTILITIES:-false}"
 install_operations="${DOTS_INSTALL_OPERATIONS:-false}"
 install_terminal="${DOTS_INSTALL_TERMINAL:-false}"
 install_input="${DOTS_INSTALL_INPUT:-false}"
-install_gaming="${DOTS_INSTALL_GAMING:-false}"
+install_entertainment="${DOTS_INSTALL_ENTERTAINMENT:-false}"
 install_communication="${DOTS_INSTALL_COMMUNICATION:-false}"
 install_desktop="${DOTS_INSTALL_DESKTOP:-false}"
 
@@ -154,9 +169,15 @@ else
       pkg_basename=$(basename "$pkg_file" .sh)
       [ "$pkg_basename" = "00-init" ] && continue
       pkg_category="$(pkg_category_of "$pkg_basename")"
-      picker_options+=("$pkg_basename (${pkg_category})")
+      pkg_probe="$(sed -n 's/^pkg_name="\([^"]*\)"$/\1/p' "$pkg_file" | head -1)"
+      if [ -n "$pkg_probe" ] && check_installed "$pkg_probe"; then
+        continue
+      fi
+      picker_options+=("$pkg_basename ($(pkg_category_short "$pkg_category"))")
     done
-    if [ ${#picker_options[@]} -gt 0 ]; then
+    if [ ${#picker_options[@]} -eq 0 ]; then
+      echo "==> All packages already installed"
+    else
       echo "==> Select packages to install"
       if picker_result="$(multiselect "${picker_options[@]}")"; then
         pick_mode="selection"
@@ -183,7 +204,7 @@ else
       pkg_category="$(pkg_category_of "$pkg_basename")"
 
       case "$pkg_category" in
-        shell | build | runtimes | editor | ai | utilities | operations | terminal | input | gaming | communication | desktop)
+        shell | build | runtimes | editor | ai | utilities | operations | terminal | input | entertainment | communication | desktop)
           if ! category_enabled "$pkg_category"; then
             [ "$tty_mode" = false ] && echo "==> Skipping $pkg_basename"
             continue

@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+pkg_name="tree"
+
 install_tree() {
   if check_installed tree; then
     return 0
@@ -9,7 +11,6 @@ install_tree() {
     return 0
   fi
 
-  local pkg_name="tree"
   local pkg_version="${TREE_VERSION:-2.2.0}"
 
   download_extract \

@@ -27,7 +27,7 @@ Options (accepted by non-proxy commands):
   --clear-proxy       Clear the proxy before running the command
 
 Install groups:
-  shell, build, runtimes, editor, tools, operations, ai, terminal, input, all
+  shell, build, runtimes, editor, tools, operations, ai, terminal, input, entertainment, all
 
 Examples:
   dots init
@@ -181,6 +181,9 @@ install_group() {
       ;;
     input)
       prefixes=(9?)
+      ;;
+    entertainment)
+      prefixes=(e?)
       ;;
     all)
       run_installer "$(source_dir)/installers/main.sh"

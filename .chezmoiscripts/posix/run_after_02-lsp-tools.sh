@@ -14,7 +14,7 @@ specs=(
   "vscode-html-language-server	npm:vscode-langservers-extracted@4.10.0"
   "vscode-json-language-server	npm:vscode-langservers-extracted@4.10.0"
   "docker-langserver	npm:dockerfile-language-server-nodejs@0.15.0"
-  "docker-compose-langserver	github:microsoft/compose-language-service@microsoft-compose-language-service-v0.5.0"
+  "docker-compose-langserver	npm:@microsoft/compose-language-service@0.5.0"
   "gh-actions-language-server	npm:gh-actions-language-server@0.0.3"
   "helm_ls	helm-ls@0.5.4"
   "marksman	marksman@2026-02-08"
@@ -236,7 +236,17 @@ printed=""
 for entry in "${specs[@]}"; do
   cmd="${entry%%	*}"
   spec="${entry#*	}"
-  command -v "$cmd" >/dev/null 2>&1 && continue
+  cmd_path="$(command -v "$cmd" 2>/dev/null || true)"
+  if [ -n "$cmd_path" ]; then
+    case "$cmd_path" in
+    */mise/shims/*)
+      mise which "$cmd" >/dev/null 2>&1 && continue
+      ;;
+    *)
+      continue
+      ;;
+    esac
+  fi
   case " $printed " in *" $spec "*) continue ;; esac
   printed="$printed $spec"
   missing_cmds+=("$cmd")
