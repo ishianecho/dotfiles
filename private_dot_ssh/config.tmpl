@@ -1,7 +1,9 @@
+Include ~/.ssh/config.local
+
 Host github.com
   HostName github.com
   User git
   Port 22
 {{- if ne .chezmoi.os "windows" }}
-  ProxyJump root@vpn.ishian.me
+  ProxyJump root@ssh.ishian.me
 {{- end }}
