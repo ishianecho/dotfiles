@@ -18,6 +18,7 @@ Commands:
   update --init       Pull, reinitialize, reset script state, and apply
   doctor              Run chezmoi doctor
   install <target>    Install a package or a curated group
+  offline [options]   Build an offline bundle for a machine without network
   proxy [args]        Run proxy set
 
 Options (accepted by non-proxy commands):
@@ -35,6 +36,7 @@ Examples:
   dots install zsh
   dots install input
   dots install dev
+  dots offline
   dots proxy http://127.0.0.1:10808 socks5://127.0.0.1:10808
 EOF
 }
@@ -205,6 +207,303 @@ install_group() {
   done
 }
 
+offline_usage() {
+  cat << 'EOF'
+usage: dots offline [-o output.tar.zst]
+
+Builds a self-contained bundle that restores this dotfiles environment on a
+machine without network access. Run on the online machine, copy the tarball
+over, then run restore.sh inside it. A checklist pops up to choose the
+bundle contents:
+
+  tools     self-built tools in ~/.local/bin (plus the chezmoi binary)
+  system    distro binaries git jq zsh curl, installed into ~/.local/bin
+            on the target (they need the same architecture/libc)
+  secrets   ~/.config/env and ~/.config/env.local (API keys)
+  runtimes  ~/.local/share/mise and ~/.local/share/pnpm (several GB)
+
+Without a terminal, or when the picker is dismissed, tools and system are
+bundled.
+
+The chezmoi source, caches, config and the nvim clone are always included.
+restore.sh applies the dotfiles from the bundle with scripts and git-repo
+externals skipped (git-repo externals are pre-installed from the bundle);
+once a mirror or proxy is available, remove the exclude line from
+~/.config/chezmoi/chezmoi.toml and run `dots apply`.
+
+  -o output  output path (default: dots-offline-<date>.tar.zst)
+
+Prerequisites on the offline machine: tar and zstd.
+EOF
+}
+
+select_bundle_items() {
+  local helpers
+  helpers="$(source_dir)/installers/lib/posix/helpers.sh"
+  [ -f "$helpers" ] || {
+    echo "helpers not found at $helpers" >&2
+    return 1
+  }
+  bash -c 'source "$1"; multiselect "${@:2}"' bash "$helpers" \
+    "tools (self-built ~/.local/bin)" \
+    "system (distro git jq zsh curl)" \
+    "secrets (env files with API keys)" \
+    "runtimes (mise, pnpm; several GB)" |
+    sed 's/ (.*$//'
+}
+
+write_restore() {
+  local staging="$1"
+  cat > "$staging/restore.sh" << 'RESTORE_EOF'
+#!/bin/sh
+
+set -eu
+
+staging="$(cd "$(dirname "$0")" && pwd)"
+home="${HOME:?HOME is not set}"
+force=false
+[ "${1:-}" = "--force" ] && force=true
+
+say() { printf '%s\n' "$*" >&2; }
+
+if command -v chezmoi >/dev/null 2>&1; then
+  chezmoi_bin="$(command -v chezmoi)"
+else
+  chezmoi_bin="$home/.local/bin/chezmoi"
+  if [ ! -x "$chezmoi_bin" ]; then
+    if [ -x "$staging/chezmoi-bin/chezmoi" ]; then
+      mkdir -p "$home/.local/bin"
+      cp -a "$staging/chezmoi-bin/chezmoi" "$chezmoi_bin"
+    else
+      say "error: chezmoi not found and not bundled"
+      exit 1
+    fi
+  fi
+fi
+
+if [ -d "$staging/local-bin" ]; then
+  say "installing ~/.local/bin"
+  mkdir -p "$home/.local/bin"
+  cp -a "$staging/local-bin/." "$home/.local/bin/"
+fi
+
+if [ -d "$staging/system-bin" ]; then
+  say "installing distro tools into ~/.local/bin"
+  mkdir -p "$home/.local/bin"
+  cp -a "$staging/system-bin/." "$home/.local/bin/"
+fi
+
+if [ -d "$staging/chezmoi-cache" ]; then
+  say "installing chezmoi caches"
+  mkdir -p "$home/.cache"
+  rm -rf "$home/.cache/chezmoi"
+  cp -a "$staging/chezmoi-cache" "$home/.cache/chezmoi"
+fi
+
+if [ -d "$staging/env" ]; then
+  say "installing env files"
+  mkdir -p "$home/.config"
+  cp -a "$staging/env/." "$home/.config/"
+  chmod 600 "$home/.config"/env "$home/.config"/env.local 2>/dev/null || true
+fi
+
+source_dir="$home/.local/share/chezmoi"
+if [ -e "$source_dir" ]; then
+  if [ "$force" = false ]; then
+    say "error: $source_dir already exists; move it away or pass --force"
+    exit 1
+  fi
+  rm -rf "$source_dir"
+fi
+say "installing chezmoi source"
+mkdir -p "$(dirname "$source_dir")"
+cp -a "$staging/chezmoi-source" "$source_dir"
+
+mkdir -p "$home/.config/chezmoi"
+if [ -d "$staging/chezmoi-config" ]; then
+  cp -a "$staging/chezmoi-config/." "$home/.config/chezmoi/"
+fi
+config="$home/.config/chezmoi/chezmoi.toml"
+if [ -f "$config" ] && ! grep -q '^exclude' "$config"; then
+  printf 'exclude = ["scripts", ".config/nvim"]\n' | cat - "$config" >"$config.tmp"
+  mv "$config.tmp" "$config"
+fi
+
+if [ -d "$staging/git-external" ]; then
+  say "installing git-repo externals"
+  mkdir -p "$home/.config"
+  cp -a "$staging/git-external/." "$home/.config/"
+fi
+
+if [ -d "$staging/runtimes" ]; then
+  for dir in "$staging/runtimes"/*; do
+    name="$(basename "$dir")"
+    say "installing runtime data: ~/.local/share/$name"
+    mkdir -p "$home/.local/share"
+    rm -rf "$home/.local/share/$name"
+    cp -a "$dir" "$home/.local/share/$name"
+  done
+fi
+
+export PATH="$home/.local/bin:$PATH"
+say "applying dotfiles (file externals from cache, scripts and git externals skipped)"
+"$chezmoi_bin" apply --refresh-externals=never
+
+say "done. next steps:"
+say "  - restart the shell, or: exec \$SHELL -l"
+say "  - once a mirror or proxy is available, remove the exclude line from ~/.config/chezmoi/chezmoi.toml and run: dots apply"
+say "  - updates without git: edit ~/.local/share/chezmoi, then: dots apply"
+RESTORE_EOF
+  chmod +x "$staging/restore.sh"
+}
+
+build_offline_bundle() {
+  local output="" chezmoi_bin staging choices tool tool_bin env_file dir
+  local want_tools want_system want_secrets want_runtimes
+
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      -o)
+        [ "$#" -ge 2 ] || {
+          echo "-o requires a path" >&2
+          exit 2
+        }
+        output="$2"
+        shift 2
+        ;;
+      -h | --help)
+        offline_usage
+        exit 0
+        ;;
+      *)
+        echo "unknown option: $1" >&2
+        offline_usage >&2
+        exit 2
+        ;;
+    esac
+  done
+
+  [ -n "$output" ] || output="dots-offline-$(date +%Y%m%d).tar.zst"
+
+  chezmoi_bin="$(command -v chezmoi || true)"
+  [ -n "$chezmoi_bin" ] || {
+    echo "chezmoi not found" >&2
+    exit 1
+  }
+
+  local src
+  src="$(source_dir)"
+  [ -d "$src" ] || {
+    echo "chezmoi source not found at $src" >&2
+    exit 1
+  }
+
+  local tool
+  for tool in tar zstd; do
+    command -v "$tool" >/dev/null || {
+      echo "$tool not found" >&2
+      exit 1
+    }
+  done
+
+  choices="tools system"
+  if [ -t 0 ] && [ -t 1 ]; then
+    echo "==> Select bundle contents"
+    if ! choices="$(select_bundle_items)"; then
+      echo "==> Picker dismissed, bundling defaults: tools system"
+      choices="tools system"
+    fi
+  fi
+  want_tools=false want_system=false want_secrets=false want_runtimes=false
+  case " $choices " in *" tools "*) want_tools=true ;; esac
+  case " $choices " in *" system "*) want_system=true ;; esac
+  case " $choices " in *" secrets "*) want_secrets=true ;; esac
+  case " $choices " in *" runtimes "*) want_runtimes=true ;; esac
+
+  staging="$(mktemp -d)"
+  trap 'rm -rf "$staging"' RETURN
+
+  echo "staging chezmoi source: $src"
+  mkdir -p "$staging/chezmoi-source"
+  cp -a "$src/." "$staging/chezmoi-source/"
+  rm -rf "$staging/chezmoi-source/.git/rebase-merge" "$staging/chezmoi-source/.git/rebase-apply"
+
+  if [ -d "$HOME/.cache/chezmoi" ]; then
+    echo "staging chezmoi caches"
+    mkdir -p "$staging/chezmoi-cache"
+    cp -a "$HOME/.cache/chezmoi/." "$staging/chezmoi-cache/"
+  fi
+
+  if [ -d "$HOME/.config/nvim/.git" ]; then
+    echo "staging ~/.config/nvim (git-repo external)"
+    mkdir -p "$staging/git-external"
+    cp -a "$HOME/.config/nvim" "$staging/git-external/nvim"
+  else
+    echo "warning: ~/.config/nvim is not a git clone; restore will try to clone it" >&2
+  fi
+
+  if [ -d "$HOME/.config/chezmoi" ]; then
+    echo "staging chezmoi config"
+    mkdir -p "$staging/chezmoi-config"
+    cp -a "$HOME/.config/chezmoi/." "$staging/chezmoi-config/"
+    rm -f "$staging/chezmoi-config/chezmoistate.boltdb" "$staging/chezmoi-config/chezmoistate.boltdb.lock"
+  fi
+
+  mkdir -p "$staging/chezmoi-bin"
+  cp -a "$chezmoi_bin" "$staging/chezmoi-bin/chezmoi"
+
+  if [ "$want_tools" = true ] && [ -d "$HOME/.local/bin" ]; then
+    echo "staging ~/.local/bin"
+    mkdir -p "$staging/local-bin"
+    cp -a "$HOME/.local/bin/." "$staging/local-bin/"
+  fi
+
+  if [ "$want_system" = true ]; then
+    for tool in git jq zsh curl; do
+      tool_bin="$(command -v "$tool" || true)"
+      if [ -n "$tool_bin" ]; then
+        echo "staging distro tool: $tool_bin"
+        mkdir -p "$staging/system-bin"
+        cp -aL "$tool_bin" "$staging/system-bin/"
+      else
+        echo "warning: $tool not found on this machine, skipping" >&2
+      fi
+    done
+  fi
+
+  if [ "$want_secrets" = true ]; then
+    local found=false
+    for env_file in "$HOME/.config/env" "$HOME/.config/env.local"; do
+      if [ -r "$env_file" ]; then
+        echo "staging secret: $env_file"
+        mkdir -p "$staging/env"
+        cp -a "$env_file" "$staging/env/"
+        found=true
+      fi
+    done
+    if [ "$found" = false ]; then
+      echo "warning: secrets selected but no env files found" >&2
+    fi
+  fi
+
+  if [ "$want_runtimes" = true ]; then
+    for dir in mise pnpm; do
+      if [ -d "$HOME/.local/share/$dir" ]; then
+        echo "staging runtime data: ~/.local/share/$dir"
+        mkdir -p "$staging/runtimes"
+        cp -a "$HOME/.local/share/$dir" "$staging/runtimes/$dir"
+      fi
+    done
+  fi
+
+  write_restore "$staging"
+
+  echo "writing $output"
+  tar -C "$staging" -c --zstd -f "$output" .
+  chmod 600 "$output"
+  du -h "$output"
+}
+
 if [ "${1:-}" = proxy ]; then
   shift
   exec "$(proxy_script_path)" set "$@"
@@ -330,6 +629,10 @@ case "${1:-help}" in
   proxy)
     shift
     exec "$(proxy_script_path)" set "$@"
+    ;;
+  offline)
+    shift
+    build_offline_bundle "$@"
     ;;
   install)
     shift
