@@ -19,7 +19,7 @@ specs=(
   "helm_ls	helm-ls@0.5.4"
   "marksman	marksman@2026-02-08"
   "nginx-language-server	pipx:nginx-language-server@0.9.0"
-  "rust-analyzer	rust-analyzer@2026-11-02"
+  "rust-analyzer	rust-analyzer"
   "taplo	taplo@0.10.0"
   "texlab	cargo:texlab@4.3.2"
   "tinymist	tinymist@0.15.12"
@@ -162,6 +162,18 @@ install_groovyls() {
   echo "Groovy language server installed: ~/.local/bin/groovy-language-server"
 }
 
+install_rust_analyzer() {
+  if rust-analyzer --version >/dev/null 2>&1; then
+    return 0
+  fi
+  if ! command -v rustup >/dev/null 2>&1; then
+    echo "rustup not found, cannot install rust-analyzer" >&2
+    return 1
+  fi
+  rustup component add rust-analyzer
+  rust-analyzer --version
+}
+
 install_selected() {
   local tmpdir
   tmpdir="$(mktemp -d)"
@@ -188,6 +200,12 @@ install_selected() {
         bg_specs+=("$spec")
         bg_logs+=("$tmpdir/${#bg_specs[@]}.log")
         install_groovyls >"${bg_logs[-1]}" 2>&1 </dev/null &
+        bg_pids+=($!)
+        ;;
+      rust-analyzer)
+        bg_specs+=("$spec")
+        bg_logs+=("$tmpdir/${#bg_specs[@]}.log")
+        install_rust_analyzer >"${bg_logs[-1]}" 2>&1 </dev/null &
         bg_pids+=($!)
         ;;
       *)
@@ -237,7 +255,11 @@ for entry in "${specs[@]}"; do
   cmd="${entry%%	*}"
   spec="${entry#*	}"
   cmd_path="$(command -v "$cmd" 2>/dev/null || true)"
-  if [ -n "$cmd_path" ]; then
+  if [ "$cmd" = "rust-analyzer" ]; then
+    if rust-analyzer --version >/dev/null 2>&1; then
+      continue
+    fi
+  elif [ -n "$cmd_path" ]; then
     case "$cmd_path" in
     */mise/shims/*)
       mise which "$cmd" >/dev/null 2>&1 && continue
@@ -266,7 +288,7 @@ print_missing() {
   echo "$count tool(s) missing, install with:"
   for spec in "${missing_specs[@]}"; do
     case "$spec" in
-      jdtls | kotlin-lsp | groovy-lsp)
+      jdtls | kotlin-lsp | groovy-lsp | rust-analyzer)
         echo "  bash $script_self $spec"
         ;;
       *)

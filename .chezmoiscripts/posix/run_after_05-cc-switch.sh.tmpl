@@ -96,7 +96,7 @@ install_providers() {
       --id "$id" \
       --name "$id" \
       --config-file "$cfg" \
-      --common-config
+      --common-config >/dev/null
     rm -f "$cfg"
   done < <(env | sed -n 's/^\([A-Z0-9_]\{1,\}_API_KEY\)=.*/\1/p' | sed 's/_API_KEY$//' | sort -u)
 }
@@ -107,7 +107,7 @@ context7_args='"dlx", "@upstash/context7-mcp"'
 set_codex_common() {
   local base="$CC_SWITCH_CONFIG_DIR/common-codex.toml" tmp
   if [ -z "${CONTEXT7_API_KEY:-}" ]; then
-    cc-switch --app codex config common set --file "$base"
+    cc-switch --app codex config common set --file "$base" >/dev/null
     return
   fi
   tmp="$(mktemp)"
@@ -116,7 +116,7 @@ set_codex_common() {
     printf '\n[mcp_servers.context7]\ncommand = "%s"\nargs = [%s]\n\n[mcp_servers.context7.env]\nCONTEXT7_API_KEY = "%s"\n' \
       "$context7_command" "$context7_args" "$CONTEXT7_API_KEY"
   } >"$tmp"
-  cc-switch --app codex config common set --file "$tmp"
+  cc-switch --app codex config common set --file "$tmp" >/dev/null
   rm -f "$tmp"
 }
 
@@ -127,7 +127,7 @@ fi
 claude_provider="$(current_provider claude)"
 codex_provider="$(current_provider codex)"
 
-cc-switch --app claude config common set --file "$CC_SWITCH_CONFIG_DIR/common-claude.json"
+cc-switch --app claude config common set --file "$CC_SWITCH_CONFIG_DIR/common-claude.json" >/dev/null
 set_codex_common
 
 install_providers claude

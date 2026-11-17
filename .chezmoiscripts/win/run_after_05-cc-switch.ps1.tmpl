@@ -138,7 +138,7 @@ function Install-CCSwitchProviders {
             --id $id `
             --name $id `
             --config-file $temporaryPath `
-            --common-config
+            --common-config | Out-Null
         if ($LASTEXITCODE -ne 0) {
             exit $LASTEXITCODE
         }
@@ -149,7 +149,7 @@ function Install-CCSwitchProviders {
 function Set-CCSwitchCodexCommon {
     $base = Join-Path $env:CC_SWITCH_CONFIG_DIR "common-codex.toml"
     if (-not $env:CONTEXT7_API_KEY) {
-        cc-switch --app codex config common set --file $base
+        cc-switch --app codex config common set --file $base | Out-Null
         if ($LASTEXITCODE -ne 0) {
             exit $LASTEXITCODE
         }
@@ -168,7 +168,7 @@ CONTEXT7_API_KEY = "$($env:CONTEXT7_API_KEY)"
 "@
     $temporaryPath = Join-Path $env:TEMP "cc-switch-common-codex.toml"
     (Get-Content -LiteralPath $base -Raw) + "`n" + $snippet | Set-Content -LiteralPath $temporaryPath -Encoding utf8NoBOM
-    cc-switch --app codex config common set --file $temporaryPath
+    cc-switch --app codex config common set --file $temporaryPath | Out-Null
     if ($LASTEXITCODE -ne 0) {
         exit $LASTEXITCODE
     }
@@ -182,7 +182,7 @@ if (-not (Get-Command cc-switch -ErrorAction SilentlyContinue)) {
 $claudeProvider = Get-CCSwitchCurrentProvider -App claude
 $codexProvider = Get-CCSwitchCurrentProvider -App codex
 
-cc-switch --app claude config common set --file (Join-Path $env:CC_SWITCH_CONFIG_DIR "common-claude.json")
+cc-switch --app claude config common set --file (Join-Path $env:CC_SWITCH_CONFIG_DIR "common-claude.json") | Out-Null
 if ($LASTEXITCODE -ne 0) {
     exit $LASTEXITCODE
 }
