@@ -8,20 +8,6 @@ if [ -r "$HOME/.config/env" ]; then
   . "$HOME/.config/env"
 fi
 
-expand_env() {
-  local content="$1" name value
-  while [[ $content =~ \$\{([A-Za-z_][A-Za-z0-9_]*)\} ]]; do
-    name="${BASH_REMATCH[1]}"
-    value="${!name-}"
-    if [[ -z "$value" ]]; then
-      echo "run_after_05-cc-switch: environment variable '$name' is not set, skipping" >&2
-      return 1
-    fi
-    content="${content//"\${${name}}"/$value}"
-  done
-  printf '%s' "$content"
-}
-
 provider_exists() {
   local app="$1" id="$2" output
   output="$(cc-switch --app "$app" provider list 2>/dev/null || true)"
@@ -54,10 +40,8 @@ switch_provider() {
   if ! provider_exists "$app" "$provider"; then
     fallback="$(default_provider "$app")"
     if provider_exists "$app" "$fallback"; then
-      echo "run_after_05-cc-switch: provider '$provider' not available for $app, using '$fallback'" >&2
       provider="$fallback"
     else
-      echo "run_after_05-cc-switch: provider list unavailable for $app, leaving current provider unchanged" >&2
       return 0
     fi
   fi
@@ -66,28 +50,55 @@ switch_provider() {
   fi
 }
 
+provider_config() {
+  local app="$1" id="$2" key="$3" base="$4" model="$5" wire="$6" config
+  if [ "$app" = claude ]; then
+    jq -n --arg base "$base" --arg key "$key" --arg model "$model" \
+      '{env: (if $model == "" then {ANTHROPIC_BASE_URL: $base, ANTHROPIC_AUTH_TOKEN: $key} else {ANTHROPIC_BASE_URL: $base, ANTHROPIC_AUTH_TOKEN: $key, ANTHROPIC_MODEL: $model} end)}'
+    return
+  fi
+  config=""
+  if [ -n "$model" ]; then
+    config="model = \"$model\""$'\n'
+  fi
+  config+="model_provider = \"$id\""$'\n'
+  config+='model_catalog_json = "~/.config/codex/models.json"'$'\n\n'
+  config+="[model_providers.$id]"$'\n'
+  config+="name = \"$id\""$'\n'
+  config+="base_url = \"$base\""$'\n'
+  config+="wire_api = \"$wire\""$'\n'
+  jq -n --arg key "$key" --arg config "$config" '{auth: {OPENAI_API_KEY: $key}, config: $config}'
+}
+
 install_providers() {
-  local app="$1" seed="$2" id provider_json temporary_path
-  while IFS= read -r id; do
-    if provider_exists "$app" "$id"; then
-      continue
-    fi
-
-    provider_json="$(jq --arg id "$id" '.[$id]' "$seed")"
-    if ! provider_json="$(expand_env "$provider_json")"; then
-      echo "run_after_05-cc-switch: provider '$id' for $app skipped" >&2
-      continue
-    fi
-
-    temporary_path="$(mktemp)"
-    printf '%s' "$provider_json" >"$temporary_path"
+  local app="$1" prefix base_suffix base_var key_var id key base model_var model wire_var wire cfg
+  if [ "$app" = claude ]; then
+    base_suffix="ANTHROPIC"
+  else
+    base_suffix="OPENAI"
+  fi
+  while IFS= read -r prefix; do
+    key_var="${prefix}_API_KEY"
+    key="${!key_var-}"
+    [ -n "$key" ] || continue
+    base_var="${prefix}_${base_suffix}_BASE_URL"
+    base="${!base_var-}"
+    [ -n "$base" ] || continue
+    model_var="${prefix}_MODEL"
+    model="${!model_var-}"
+    wire_var="${prefix}_WIRE_API"
+    wire="${!wire_var:-responses}"
+    id="$(printf '%s' "$prefix" | tr '[:upper:]' '[:lower:]' | tr '_' '-')"
+    provider_exists "$app" "$id" && continue
+    cfg="$(mktemp)"
+    provider_config "$app" "$id" "$key" "$base" "$model" "$wire" >"$cfg"
     cc-switch --app "$app" provider add \
       --id "$id" \
       --name "$id" \
-      --config-file "$temporary_path" \
+      --config-file "$cfg" \
       --common-config
-    rm -f "$temporary_path"
-  done < <(jq -r 'keys[]' "$seed")
+    rm -f "$cfg"
+  done < <(env | sed -n 's/^\([A-Z0-9_]\{1,\}_API_KEY\)=.*/\1/p' | sed 's/_API_KEY$//' | sort -u)
 }
 
 context7_command="pnpm"
@@ -96,7 +107,6 @@ context7_args='"dlx", "@upstash/context7-mcp"'
 set_codex_common() {
   local base="$CC_SWITCH_CONFIG_DIR/common-codex.toml" tmp
   if [ -z "${CONTEXT7_API_KEY:-}" ]; then
-    echo "run_after_05-cc-switch: CONTEXT7_API_KEY is not set, skipping context7 for codex" >&2
     cc-switch --app codex config common set --file "$base"
     return
   fi
@@ -120,8 +130,8 @@ codex_provider="$(current_provider codex)"
 cc-switch --app claude config common set --file "$CC_SWITCH_CONFIG_DIR/common-claude.json"
 set_codex_common
 
-install_providers claude "$CC_SWITCH_CONFIG_DIR/claude.json"
-install_providers codex "$CC_SWITCH_CONFIG_DIR/codex.json"
+install_providers claude
+install_providers codex
 
 if [ -n "$claude_provider" ]; then
   switch_provider claude "$claude_provider"

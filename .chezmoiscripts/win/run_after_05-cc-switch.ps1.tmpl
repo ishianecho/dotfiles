@@ -7,22 +7,6 @@ if (Test-Path -LiteralPath $dotfilesEnvironment -PathType Leaf) {
     . $dotfilesEnvironment
 }
 
-function Expand-EnvironmentTemplate {
-    param([Parameter(Mandatory = $true)][string]$Content)
-
-    $text = $Content
-    while ($text -match '\$\{([A-Za-z_][A-Za-z0-9_]*)\}') {
-        $name = $Matches[1]
-        $value = [System.Environment]::GetEnvironmentVariable($name)
-        if ([string]::IsNullOrEmpty($value)) {
-            Write-Host "run_after_05-cc-switch: environment variable '$name' is not set, skipping"
-            return $null
-        }
-        $text = $text.Replace('${' + $name + '}', $value)
-    }
-    $text
-}
-
 function Get-CCSwitchDefaultProvider {
     param([Parameter(Mandatory = $true)][string]$App)
 
@@ -71,10 +55,8 @@ function Switch-CCSwitchProvider {
     if (-not (Test-CCSwitchProvider -App $App -Id $Provider)) {
         $fallback = Get-CCSwitchDefaultProvider -App $App
         if (Test-CCSwitchProvider -App $App -Id $fallback) {
-            Write-Host "run_after_05-cc-switch: provider '$Provider' not available for $App, using '$fallback'"
             $Provider = $fallback
         } else {
-            Write-Host "run_after_05-cc-switch: provider list unavailable for $App, leaving current provider unchanged"
             return
         }
     }
@@ -84,29 +66,77 @@ function Switch-CCSwitchProvider {
     }
 }
 
-function Install-CCSwitchProviders {
+function New-CCSwitchProviderConfig {
     param(
         [Parameter(Mandatory = $true)][string]$App,
-        [Parameter(Mandatory = $true)][string]$SeedPath
+        [Parameter(Mandatory = $true)][string]$Id,
+        [Parameter(Mandatory = $true)][string]$Key,
+        [Parameter(Mandatory = $true)][string]$Base,
+        [string]$Model,
+        [string]$Wire
     )
 
-    $seed = Get-Content -LiteralPath $SeedPath -Raw | ConvertFrom-Json
-    foreach ($provider in $seed.PSObject.Properties) {
-        if (Test-CCSwitchProvider -App $App -Id $provider.Name) {
+    if ($App -eq "claude") {
+        $providerEnv = [ordered]@{
+            ANTHROPIC_BASE_URL = $Base
+            ANTHROPIC_AUTH_TOKEN = $Key
+        }
+        if ($Model) {
+            $providerEnv["ANTHROPIC_MODEL"] = $Model
+        }
+        return @{ env = $providerEnv } | ConvertTo-Json -Depth 10
+    }
+
+    $config = ""
+    if ($Model) {
+        $config += "model = `"$Model`"`n"
+    }
+    $config += "model_provider = `"$Id`"`n"
+    $config += "model_catalog_json = `"~/.config/codex/models.json`"`n`n"
+    $config += "[model_providers.$Id]`n"
+    $config += "name = `"$Id`"`n"
+    $config += "base_url = `"$Base`"`n"
+    $config += "wire_api = `"$Wire`"`n"
+    return @{ auth = @{ OPENAI_API_KEY = $Key }; config = $config } | ConvertTo-Json -Depth 10
+}
+
+function Install-CCSwitchProviders {
+    param([Parameter(Mandatory = $true)][string]$App)
+
+    $baseSuffix = "OPENAI"
+    if ($App -eq "claude") {
+        $baseSuffix = "ANTHROPIC"
+    }
+
+    $prefixes = Get-ChildItem env: |
+        Where-Object { $_.Name -cmatch '^[A-Z0-9_]+_API_KEY$' } |
+        ForEach-Object { $_.Name -replace '_API_KEY$', '' } |
+        Sort-Object -Unique
+
+    foreach ($prefix in $prefixes) {
+        $key = [System.Environment]::GetEnvironmentVariable("${prefix}_API_KEY")
+        if ([string]::IsNullOrEmpty($key)) {
             continue
         }
-
-        $expanded = Expand-EnvironmentTemplate -Content ($provider.Value | ConvertTo-Json -Depth 30)
-        if ($null -eq $expanded) {
-            Write-Host "run_after_05-cc-switch: provider '$($provider.Name)' for $App skipped"
+        $base = [System.Environment]::GetEnvironmentVariable("${prefix}_${baseSuffix}_BASE_URL")
+        if ([string]::IsNullOrEmpty($base)) {
             continue
         }
-
-        $temporaryPath = Join-Path $env:TEMP "cc-switch-$App-$($provider.Name).json"
-        Set-Content -LiteralPath $temporaryPath -Value $expanded -Encoding utf8NoBOM
+        $model = [System.Environment]::GetEnvironmentVariable("${prefix}_MODEL")
+        $wire = [System.Environment]::GetEnvironmentVariable("${prefix}_WIRE_API")
+        if ([string]::IsNullOrEmpty($wire)) {
+            $wire = "responses"
+        }
+        $id = ($prefix.ToLower()) -replace '_', '-'
+        if (Test-CCSwitchProvider -App $App -Id $id) {
+            continue
+        }
+        $json = New-CCSwitchProviderConfig -App $App -Id $id -Key $key -Base $base -Model $model -Wire $wire
+        $temporaryPath = Join-Path $env:TEMP "cc-switch-$App-$id.json"
+        Set-Content -LiteralPath $temporaryPath -Value $json -Encoding utf8NoBOM
         cc-switch --app $App provider add `
-            --id $provider.Name `
-            --name $provider.Name `
+            --id $id `
+            --name $id `
             --config-file $temporaryPath `
             --common-config
         if ($LASTEXITCODE -ne 0) {
@@ -119,7 +149,6 @@ function Install-CCSwitchProviders {
 function Set-CCSwitchCodexCommon {
     $base = Join-Path $env:CC_SWITCH_CONFIG_DIR "common-codex.toml"
     if (-not $env:CONTEXT7_API_KEY) {
-        Write-Host "run_after_05-cc-switch: CONTEXT7_API_KEY is not set, skipping context7 for codex"
         cc-switch --app codex config common set --file $base
         if ($LASTEXITCODE -ne 0) {
             exit $LASTEXITCODE
@@ -159,8 +188,8 @@ if ($LASTEXITCODE -ne 0) {
 }
 Set-CCSwitchCodexCommon
 
-Install-CCSwitchProviders -App claude -SeedPath (Join-Path $env:CC_SWITCH_CONFIG_DIR "claude.json")
-Install-CCSwitchProviders -App codex -SeedPath (Join-Path $env:CC_SWITCH_CONFIG_DIR "codex.json")
+Install-CCSwitchProviders -App claude
+Install-CCSwitchProviders -App codex
 
 if ($claudeProvider) {
     Switch-CCSwitchProvider -App claude -Provider $claudeProvider
