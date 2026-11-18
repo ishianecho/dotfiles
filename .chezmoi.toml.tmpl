@@ -24,10 +24,6 @@
 {{-   $cursorBaseSize = promptIntOnce . "cursorBaseSize" "Base cursor size before desktop scaling" 24 -}}
 {{-   $transparency = promptStringOnce . "transparency" "Terminal transparency (0.0-1.0)" "0.8" -}}
 {{- end -}}
-{{- $xrayTProxy := false -}}
-{{- if eq .chezmoi.os "linux" -}}
-{{-   $xrayTProxy = promptBoolOnce . "xrayTProxy" "Enable Xray transparent proxy" false -}}
-{{- end -}}
 
 [data]
 fontSize = {{ $fontSize }}
@@ -37,4 +33,3 @@ systemType = {{ $systemType | quote }}
 systemRelease = {{ $systemRelease | quote }}
 installCompletions = {{ $installCompletions }}
 installFonts = {{ $installFonts }}
-xrayTProxy = {{ $xrayTProxy }}

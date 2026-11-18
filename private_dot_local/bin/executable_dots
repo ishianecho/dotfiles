@@ -26,6 +26,7 @@ Options (accepted by non-proxy commands):
   --socks <url>       Set the SOCKS proxy before running the command
   --no-proxy <list>   Set hosts which bypass the proxy
   --clear-proxy       Clear the proxy before running the command
+  -R, --reinstall     Reinstall packages even if already installed
 
 Install groups:
   shell, build, runtimes, editor, tools, operations, ai, terminal, input, entertainment, all
@@ -516,9 +517,14 @@ trap 'exit 143' TERM
 command_args=()
 proxy_args=()
 proxy_clear=false
+reinstall=false
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
+    -R | --reinstall)
+      reinstall=true
+      shift
+      ;;
     --proxy)
       [ "$#" -ge 2 ] || {
         echo "--proxy requires a URL" >&2
@@ -558,6 +564,10 @@ while [ "$#" -gt 0 ]; do
       ;;
   esac
 done
+
+if [ "$reinstall" = true ]; then
+  export DOTS_REINSTALL=1
+fi
 
 if [ "$proxy_clear" = true ]; then
   [ "${#proxy_args[@]}" -eq 0 ] || {

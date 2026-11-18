@@ -25,6 +25,10 @@ library_pattern() {
 check_installed() {
   local item="$1" brew_package
 
+  if [ "${DOTS_REINSTALL:-0}" = "1" ]; then
+    return 1
+  fi
+
   command -v "$item" >/dev/null 2>&1 && return 0
 
   case "$pkg_manager" in
