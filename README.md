@@ -77,6 +77,15 @@ winget install Git.Git
 
 </details>
 
+<details>
+<summary>Android (Termux, rooted)</summary>
+
+```sh
+pkg install chezmoi git
+```
+
+</details>
+
 Bootstrap:
 
 ```sh
