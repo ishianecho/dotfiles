@@ -646,6 +646,18 @@ case "${1:-help}" in
     ;;
   install)
     shift
+    install_args=()
+    for arg in "$@"; do
+      case "$arg" in
+        -R | --reinstall)
+          export DOTS_REINSTALL=1
+          ;;
+        *)
+          install_args+=("$arg")
+          ;;
+      esac
+    done
+    set -- "${install_args[@]}"
     if [ "$#" -eq 0 ]; then
       echo "dots install requires a package or group name" >&2
       exit 2

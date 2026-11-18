@@ -9,7 +9,7 @@ install_handy() {
   local raw_base="https://raw.githubusercontent.com/ishianecho/bin/main/posix"
   local tool tmp
   for tool in ghf updnvim notify port; do
-    if [ -e "$bin_dir/$tool" ]; then
+    if check_installed "$tool"; then
       continue
     fi
     tmp="$bin_dir/$tool.tmp.$$"

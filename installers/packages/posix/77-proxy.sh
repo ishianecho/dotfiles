@@ -22,7 +22,7 @@ install_proxy() {
   local release_base="https://github.com/ishianecho/bin/releases/latest/download"
   local tool tmp
   for tool in "${binaries[@]}"; do
-    if [ -e "$bin_dir/$tool" ]; then
+    if check_installed "$tool"; then
       continue
     fi
     tmp="$bin_dir/$tool.tmp.$$"
