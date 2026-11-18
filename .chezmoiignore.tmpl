@@ -37,6 +37,18 @@ AppData/
 .chezmoiscripts/posix/run_onchange_after_11-gnome-extensions.sh.tmpl
 {{- end }}
 
+{{- if ne .chezmoi.os "android" }}
+.termux
+{{- else }}
+.config/kitty
+.config/alacritty
+.config/fontconfig
+.config/zed
+.config/sqls
+.icons
+.local/share/icons
+{{- end }}
+
 .config/claude/settings.json
 .config/codex/config.toml
 .config/xray

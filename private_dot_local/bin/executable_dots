@@ -45,7 +45,7 @@ run_installer() {
   local init_script
   init_script="$(source_dir)/installers/packages/posix/00-init.sh"
   if [ -f "$init_script" ]; then
-    bash -c 'source "$1"; source "$2"' bash "$init_script" "$1"
+    bash -c 'source "$1"; if android_redirect_installer "$2"; then exit 0; fi; source "$2"' bash "$init_script" "$1"
   else
     bash "$1"
   fi

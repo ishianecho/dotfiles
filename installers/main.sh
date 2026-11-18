@@ -168,6 +168,9 @@ else
     for pkg_file in "${sorted_packages[@]}"; do
       pkg_basename=$(basename "$pkg_file" .sh)
       [ "$pkg_basename" = "00-init" ] && continue
+      if [ "$pkg_manager" = "termux" ]; then
+        android_skipped_pkg "$pkg_basename" && continue
+      fi
       pkg_category="$(pkg_category_of "$pkg_basename")"
       pkg_probe="$(sed -n 's/^pkg_name="\([^"]*\)"$/\1/p' "$pkg_file" | head -1)"
       if [ -n "$pkg_probe" ] && check_installed "$pkg_probe"; then
@@ -221,7 +224,9 @@ else
     (
       rc=0
       (
-        source "$pkg_file"
+        if ! android_redirect_installer "$pkg_file"; then
+          source "$pkg_file"
+        fi
       ) || rc=$?
       : >"$jobs_tmp/$job_idx.mark"
       exit "$rc"

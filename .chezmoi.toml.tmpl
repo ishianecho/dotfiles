@@ -14,10 +14,16 @@
 {{-   $systemRelease = .chezmoi.osRelease.id -}}
 {{- end -}}
 {{- $installCompletions := promptBoolOnce . "installCompletions" "Install shell completions" true -}}
-{{- $installFonts := promptBoolOnce . "installFonts" "Install fonts" true -}}
-{{- $fontSize := promptIntOnce . "fontSize" "Font size for terminals and input method" 16 -}}
-{{- $cursorBaseSize := promptIntOnce . "cursorBaseSize" "Base cursor size before desktop scaling" 24 -}}
-{{- $transparency := promptStringOnce . "transparency" "Terminal transparency (0.0-1.0)" "0.8" -}}
+{{- $installFonts := false -}}
+{{- $fontSize := 16 -}}
+{{- $cursorBaseSize := 24 -}}
+{{- $transparency := "0.8" -}}
+{{- if ne .chezmoi.os "android" -}}
+{{-   $installFonts = promptBoolOnce . "installFonts" "Install fonts" true -}}
+{{-   $fontSize = promptIntOnce . "fontSize" "Font size for terminals and input method" 16 -}}
+{{-   $cursorBaseSize = promptIntOnce . "cursorBaseSize" "Base cursor size before desktop scaling" 24 -}}
+{{-   $transparency = promptStringOnce . "transparency" "Terminal transparency (0.0-1.0)" "0.8" -}}
+{{- end -}}
 {{- $xrayTProxy := false -}}
 {{- if eq .chezmoi.os "linux" -}}
 {{-   $xrayTProxy = promptBoolOnce . "xrayTProxy" "Enable Xray transparent proxy" false -}}

@@ -98,6 +98,9 @@ case "$system_release" in
     fi
     ;;
 esac
+if [ -z "$pkg_manager" ] && [ -n "${TERMUX_VERSION:-}" ] && command -v pkg > /dev/null 2>&1; then
+  pkg_manager="termux"
+fi
 if [ -z "$pkg_manager" ] && command -v apt-get > /dev/null 2>&1; then
   pkg_manager="apt"
 fi

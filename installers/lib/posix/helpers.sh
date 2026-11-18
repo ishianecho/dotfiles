@@ -37,6 +37,9 @@ check_installed() {
   apt)
     dpkg -s "$item" >/dev/null 2>&1 && return 0
     ;;
+  termux)
+    dpkg -s "$(termux_package_name "$item")" >/dev/null 2>&1 && return 0
+    ;;
   brew)
     brew_package="$(brew_package_name "$item")"
     [ -n "$brew_package" ] && brew list "$brew_package" >/dev/null 2>&1 && return 0
@@ -218,7 +221,88 @@ install_via_dnf() {
   pkg_lock sudo dnf install -y "${packages[@]}"
 }
 
+termux_package_name() {
+  case "$1" in
+  libssl-dev) echo "openssl" ;;
+  libutf8proc-dev) echo "utf8proc" ;;
+  libnpth0-dev) echo "libnpth" ;;
+  sqlite3) echo "sqlite" ;;
+  fd-find) echo "fd" ;;
+  wl-clipboard | xclip | breeze-cursor-theme | gnome-shell-extension-manager | linuxqq | wechat | discord | feishu | xray) echo "" ;;
+  *) echo "$1" ;;
+  esac
+}
+
+install_via_termux() {
+  if [ "$pkg_manager" != "termux" ]; then
+    return 1
+  fi
+
+  local package
+  local packages=()
+  for package in "$@"; do
+    package="$(termux_package_name "$package")"
+    [ -n "$package" ] && packages+=("$package")
+  done
+
+  if [ ${#packages[@]} -eq 0 ]; then
+    return 1
+  fi
+
+  echo "Installing via pkg: ${packages[*]}"
+  pkg_lock pkg install -y -o Dpkg::Lock::Timeout=60 "${packages[@]}"
+}
+
+android_replaced_pkg() {
+  case "$1" in
+  30-uv | 32-pnpm | 34-rust | 40-nvim | 70-kubectl) return 0 ;;
+  *) return 1 ;;
+  esac
+}
+
+android_skipped_pkg() {
+  case "$1" in
+  31-mise | 52-serena | 64-clipboard | 81-kitty | 90-fcitx5 | 91-breeze-cursor | c0-linuxqq | c1-wechat | c2-discord | c3-feishu | d0-extension-manager | e0-gaming | e1-songloft) return 0 ;;
+  *) return 1 ;;
+  esac
+}
+
+android_install_replacement() {
+  case "$1" in
+  30-uv) install_via_termux uv ;;
+  32-pnpm)
+    install_via_termux nodejs-lts &&
+      { corepack enable pnpm || npm install -g pnpm; }
+    ;;
+  34-rust) install_via_termux rust ;;
+  40-nvim) install_via_termux neovim ;;
+  70-kubectl) install_via_termux kubectl ;;
+  esac
+}
+
+android_redirect_installer() {
+  if [ "$pkg_manager" != "termux" ]; then
+    return 1
+  fi
+
+  local base
+  base="$(basename "$1" .sh)"
+  if android_skipped_pkg "$base"; then
+    echo "==> Skipping $base (unsupported on android)"
+    return 0
+  fi
+  if android_replaced_pkg "$base"; then
+    android_install_replacement "$base"
+    return 0
+  fi
+  return 1
+}
+
 try_package_manager() {
+  if [ "$pkg_manager" = "termux" ]; then
+    install_via_termux "$@"
+    return $?
+  fi
   if [ "$pkg_manager" = "apt" ] && [ "$has_sudo" = "true" ]; then
     install_via_apt "$@"
     return $?

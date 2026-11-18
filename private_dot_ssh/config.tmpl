@@ -4,6 +4,6 @@ Host github.com
   HostName github.com
   User git
   Port 22
-{{- if ne .chezmoi.os "windows" }}
+{{- if and (ne .chezmoi.os "windows") (ne .chezmoi.os "android") }}
   ProxyJump root@ssh.ishian.me
 {{- end }}

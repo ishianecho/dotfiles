@@ -12,7 +12,7 @@ url = "git@github.com:ishianecho/ishian.nvim.git"
 url = "https://github.com/ishianecho/ishian.nvim.git"
 {{ end }}
 
-{{ if $installFonts }}
+{{ if and $installFonts (ne .chezmoi.os "android") }}
 [fonts]
 type = "archive"
 url = "https://github.com/ishianecho/assets/releases/download/fonts-v2.1/fonts.tar.xz"
