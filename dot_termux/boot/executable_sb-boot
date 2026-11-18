@@ -1,0 +1,22 @@
+#!/data/data/com.termux/files/usr/bin/sh
+export PATH=/data/data/com.termux/files/usr/bin:$PATH
+CONFIG=/data/data/com.termux/files/home/src/vpn-android/generated/sing-box-android.json
+STATE=/data/data/com.termux/files/home/.cache/sing-box
+case "${1:-start}" in
+  start)
+    [ -f "$CONFIG" ] || {
+      echo "no config: $CONFIG" >&2
+      exit 1
+    }
+    mkdir -p "$STATE"
+    termux-wake-lock
+    su -c "nohup /data/data/com.termux/files/usr/bin/sing-box run -D $STATE -c $CONFIG >/dev/null 2>&1 &"
+    ;;
+  stop)
+    su -c "pkill -f 'sing-box run'"
+    ;;
+  *)
+    echo "Usage: sb-boot [start|stop]" >&2
+    exit 1
+    ;;
+esac

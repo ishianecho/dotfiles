@@ -55,8 +55,8 @@ $env:SCOOP_DIR = "D:\Scoop"
 | `build` | Compilers, MSVC/MinGW on Windows, build tools, and base libraries |
 | `runtimes` | `uv`, `mise`, `pnpm` (with `npm` fallback), `luajit`, `rust` |
 | `editor` | `nvim`, `tree-sitter` |
-| `tools` / `dev` | `7-Zip`, `fzf`, `PSFzf`, `posh-git`, `fd`, `ripgrep`, `gh`, `sqlite3`, `zoxide`, `jq`, `yq`, POSIX `direnv`; POSIX clipboard providers `wl-clipboard` (Linux) and `xclip` (WSL); Windows `tree` and `less` through MSYS2 |
-| `operations` | `kubectl`, `netcat`, `openssh` (POSIX; Windows uses system OpenSSH), `cf` (Cloudflare CLI via pnpm); Arch-based Linux additionally installs `paru` (AUR helper) and `xray-bin`; Windows additionally installs `xray` and `nssm` (Xray service wrapper) |
+| `tools` / `dev` | `7-Zip`, `fzf`, `PSFzf`, `posh-git`, `fd`, `ripgrep`, `gh`, `sqlite3`, `zoxide`, `jq`, `yq`, POSIX `direnv`; POSIX clipboard providers `wl-clipboard` (Linux) and `xclip` (WSL); Windows `tree` and `less` through MSYS2; the [ishianecho/bin](https://github.com/ishianecho/bin) personal tools (`ghf`, `updnvim`, `notify`, `port`; Windows `updnvim.ps1`) into `~/.local/bin` |
+| `operations` | `kubectl`, `netcat`, `openssh` (POSIX; Windows uses system OpenSSH), `cf` (Cloudflare CLI via pnpm); Arch-based Linux additionally installs `paru` (AUR helper) and `xray-bin`; the [ishianecho/bin](https://github.com/ishianecho/bin) personal proxy tools (`proxy`, `xrayctl`, `sbctl` on POSIX Linux; Windows `proxy` and `xrayctl`) into `~/.local/bin`; Windows additionally installs `xray` and `nssm` (Xray service wrapper) |
 | `ai` | `cc-switch`, `codex`, `claude`, `serena`, `github-mcp-server`, `codegraph`; Windows additionally installs the MSYS2 bundle |
 | `terminal` | POSIX `tmux`, `kitty`; Windows MSYS2 `tmux` and Windows Terminal |
 | `input` | Linux `fcitx5` with Chinese addons and Rime (`librime`, 白霜拼音); `breeze-cursor-theme` set as the default cursor (Linux) |

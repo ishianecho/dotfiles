@@ -115,9 +115,23 @@ dots apply --scoop-prefix D:/Scoop
 
 See [`PACKAGES.md`](PACKAGES.md) for package groups and installer ordering.
 
-The `proxy`, `xrayctl`, `ghf`, and `updnvim` tools live in
-[ishianecho/bin](https://github.com/ishianecho/bin) and are installed into
-`~/.local/bin` via `.chezmoiexternal`.
+The `ghf`, `updnvim`, `notify`, `port`, `proxy`, `xrayctl`, and `sbctl`
+tools live in [ishianecho/bin](https://github.com/ishianecho/bin) and are
+installed into `~/.local/bin` by the `handy` and `proxy` installer
+packages.
+
+## Proxy
+
+`proxy` works with any local listener or corporate proxy; see
+[`PROXY.md`](https://github.com/ishianecho/bin/blob/main/PROXY.md) for
+the scenarios (company GUI client, corporate proxy URL, or your own
+node via `xrayctl`/`sbctl`).
+
+On a rooted Android phone (Termux), `~/.termux/boot/sb-boot` starts the
+generated sing-box config as root at boot; `sb-boot start|stop` toggles
+it. Requires `pkg install sing-box git`, the vpn repo cloned at
+`~/src/vpn-android`, the Magisk grant for Termux set to remember, and
+Private DNS off.
 
 ## Notes
 
