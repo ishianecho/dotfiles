@@ -2,10 +2,12 @@
 
 set -euo pipefail
 
-mise_path="${MISE_INSTALL_PATH:-$HOME/.local/bin/mise}"
-mise_config="${MISE_CONFIG_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/mise}/config.toml"
+. "{{ .chezmoi.sourceDir }}/installers/lib/posix/env.sh"
+. "{{ .chezmoi.sourceDir }}/installers/lib/posix/helpers.sh"
 
-if [ ! -x "$mise_path" ]; then
+mise_config="${MISE_CONFIG_DIR}/config.toml"
+
+if ! check_installed mise; then
   echo "Warning: mise is not installed; skipping configured mise tools." >&2
   exit 0
 fi
@@ -16,4 +18,6 @@ if [ ! -f "$mise_config" ]; then
 fi
 
 echo "Installing tools from $mise_config..."
-(cd "$HOME" && "$mise_path" install)
+if ! (cd "$HOME" && mise install); then
+  echo "Warning: mise install failed" >&2
+fi

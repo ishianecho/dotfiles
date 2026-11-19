@@ -2,10 +2,16 @@
 
 set -euo pipefail
 
+. "{{ .chezmoi.sourceDir }}/installers/lib/posix/env.sh"
+. "{{ .chezmoi.sourceDir }}/installers/lib/posix/helpers.sh"
+
 zplug_init="${XDG_DATA_HOME:-$HOME/.local/share}/zplug/init.zsh"
 [ -f "$zplug_init" ] || exit 0
 [ -f "$HOME/.zshrc" ] || exit 0
-command -v zsh > /dev/null 2>&1 || exit 0
+check_installed zsh || {
+  echo "Warning: zsh is not installed; skipping zplug plugins." >&2
+  exit 0
+}
 
 ZPLUG_AUTO_INSTALL=1 zsh -i -l -c 'exit' || {
   echo "Warning: zplug plugin installation failed" >&2

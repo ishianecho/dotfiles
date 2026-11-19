@@ -138,9 +138,10 @@ node via `xrayctl`/`sbctl`).
 
 On a rooted Android phone (Termux), `~/.termux/boot/sb-boot` starts the
 generated sing-box config as root at boot; `sb-boot start|stop` toggles
-it. Requires `pkg install sing-box git`, the vpn repo cloned at
-`~/src/vpn-android`, the Magisk grant for Termux set to remember, and
-Private DNS off.
+it. The config is downloaded from the vpn repo at start and cached under
+`~/.cache/sing-box`; the last cached copy is used when the download
+fails. Requires `pkg install sing-box`, the Magisk grant for Termux set
+to remember, and Private DNS off.
 
 ## Notes
 

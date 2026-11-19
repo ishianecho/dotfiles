@@ -2,13 +2,15 @@
 
 set -euo pipefail
 
+. "{{ .chezmoi.sourceDir }}/installers/lib/posix/env.sh"
+. "{{ .chezmoi.sourceDir }}/installers/lib/posix/helpers.sh"
+
 config="${XDG_CONFIG_HOME:-$HOME/.config}/proxy/config"
 [ -f "$config" ] || exit 0
 
-proxy="$HOME/.local/bin/proxy"
-[ -x "$proxy" ] || {
+if ! check_installed proxy; then
   echo "Warning: proxy is not installed; skipping proxy synchronization." >&2
   exit 0
-}
+fi
 
-"$proxy" sync
+proxy sync || echo "Warning: proxy sync failed" >&2

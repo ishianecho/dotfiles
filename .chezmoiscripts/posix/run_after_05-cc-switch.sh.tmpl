@@ -8,6 +8,9 @@ if [ -r "$HOME/.config/env" ]; then
   . "$HOME/.config/env"
 fi
 
+. "{{ .chezmoi.sourceDir }}/installers/lib/posix/env.sh"
+. "{{ .chezmoi.sourceDir }}/installers/lib/posix/helpers.sh"
+
 provider_exists() {
   local app="$1" id="$2" output
   output="$(cc-switch --app "$app" provider list 2>/dev/null || true)"
@@ -96,7 +99,7 @@ install_providers() {
       --id "$id" \
       --name "$id" \
       --config-file "$cfg" \
-      --common-config >/dev/null
+      --common-config >/dev/null || echo "Warning: failed to add $app provider $id" >&2
     rm -f "$cfg"
   done < <(env | sed -n 's/^\([A-Z0-9_]\{1,\}_API_KEY\)=.*/\1/p' | sed 's/_API_KEY$//' | sort -u)
 }
@@ -107,7 +110,7 @@ context7_args='"dlx", "@upstash/context7-mcp"'
 set_codex_common() {
   local base="$CC_SWITCH_CONFIG_DIR/common-codex.toml" tmp
   if [ -z "${CONTEXT7_API_KEY:-}" ]; then
-    cc-switch --app codex config common set --file "$base" >/dev/null
+    cc-switch --app codex config common set --file "$base" >/dev/null || echo "Warning: failed to apply codex common config" >&2
     return
   fi
   tmp="$(mktemp)"
@@ -116,18 +119,19 @@ set_codex_common() {
     printf '\n[mcp_servers.context7]\ncommand = "%s"\nargs = [%s]\n\n[mcp_servers.context7.env]\nCONTEXT7_API_KEY = "%s"\n' \
       "$context7_command" "$context7_args" "$CONTEXT7_API_KEY"
   } >"$tmp"
-  cc-switch --app codex config common set --file "$tmp" >/dev/null
+  cc-switch --app codex config common set --file "$tmp" >/dev/null || echo "Warning: failed to apply codex common config" >&2
   rm -f "$tmp"
 }
 
-if ! command -v cc-switch >/dev/null 2>&1; then
+check_installed cc-switch || {
+  echo "Warning: cc-switch is not installed; skipping provider sync." >&2
   exit 0
-fi
+}
 
 claude_provider="$(current_provider claude)"
 codex_provider="$(current_provider codex)"
 
-cc-switch --app claude config common set --file "$CC_SWITCH_CONFIG_DIR/common-claude.json" >/dev/null
+cc-switch --app claude config common set --file "$CC_SWITCH_CONFIG_DIR/common-claude.json" >/dev/null || echo "Warning: failed to apply claude common config" >&2
 set_codex_common
 
 install_providers claude

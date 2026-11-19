@@ -2,13 +2,27 @@
 
 set -euo pipefail
 
-command -v gsettings >/dev/null 2>&1 || exit 0
-command -v dconf >/dev/null 2>&1 || exit 0
+. "{{ .chezmoi.sourceDir }}/installers/lib/posix/env.sh"
+. "{{ .chezmoi.sourceDir }}/installers/lib/posix/helpers.sh"
+
+check_installed gsettings || {
+  echo "Warning: gsettings is not installed; skipping GNOME extension setup." >&2
+  exit 0
+}
+check_installed dconf || {
+  echo "Warning: dconf is not installed; skipping GNOME extension setup." >&2
+  exit 0
+}
 
 gsettings set org.gnome.shell enabled-extensions \
-  "['gpu-screen-recorder@dec05eba.com', 'just-perfection-desktop@just-perfection', 'kimpanel@kde.org', 'appindicatorsupport@rgcjonas.gmail.com']"
+  "['gpu-screen-recorder@dec05eba.com', 'just-perfection-desktop@just-perfection', 'kimpanel@kde.org', 'appindicatorsupport@rgcjonas.gmail.com']" ||
+  echo "Warning: failed to set enabled-extensions" >&2
 
-gsettings set org.gnome.shell disable-user-extensions false
+gsettings set org.gnome.shell disable-user-extensions false ||
+  echo "Warning: failed to enable user extensions" >&2
 
-dconf write /org/gnome/shell/extensions/just-perfection/notification-banner-position 2
-dconf write /org/gnome/shell/extensions/kimpanel/font "'LXGW WenKai Mono {{ .fontSize }}'"
+dconf write /org/gnome/shell/extensions/just-perfection/notification-banner-position 2 ||
+  echo "Warning: failed to set notification-banner-position" >&2
+
+dconf write /org/gnome/shell/extensions/kimpanel/font "'LXGW WenKai Mono {{ .fontSize }}'" ||
+  echo "Warning: failed to set kimpanel font" >&2
