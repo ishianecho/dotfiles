@@ -236,16 +236,16 @@ install_selected() {
 
 script_self="$HOME/src/chezmoi/.chezmoiscripts/posix/run_after_02-lsp-tools.sh"
 
+if ! command -v mise >/dev/null 2>&1; then
+  echo "mise not installed, skipping LSP tools installer"
+  exit 0
+fi
+
 if [ "$#" -gt 0 ]; then
   if install_selected "$@"; then
     exit 0
   fi
   exit 1
-fi
-
-if ! command -v mise >/dev/null 2>&1; then
-  echo "mise not installed, skipping LSP tools installer"
-  exit 0
 fi
 
 missing_cmds=()
