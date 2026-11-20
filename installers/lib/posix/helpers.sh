@@ -266,7 +266,15 @@ android_replaced_pkg() {
 
 android_skipped_pkg() {
   case "$1" in
-  31-mise | 52-serena | 64-clipboard | 79-mutagen | 81-kitty | 90-fcitx5 | 91-breeze-cursor | c0-linuxqq | c1-wechat | c2-discord | c3-feishu | c4-rustdesk | d0-extension-manager | e0-gaming | e1-songloft) return 0 ;;
+  31-mise | 52-serena | 64-clipboard | 74-xray | 79-mutagen | 81-kitty | 90-fcitx5 | 91-breeze-cursor | c0-linuxqq | c1-wechat | c2-discord | c3-feishu | c4-rustdesk | d0-extension-manager | e0-gaming | e1-songloft) return 0 ;;
+  *) return 1 ;;
+  esac
+}
+
+android_skipped_tool() {
+  [ "$pkg_manager" = "termux" ] || return 1
+  case "$1" in
+  sbctl | notify | updnvim | port) return 0 ;;
   *) return 1 ;;
   esac
 }

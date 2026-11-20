@@ -9,6 +9,10 @@ install_handy() {
   local raw_base="https://raw.githubusercontent.com/ishianecho/bin/main/posix"
   local tool tmp
   for tool in ghf updnvim notify port; do
+    if android_skipped_tool "$tool"; then
+      echo "Skipping $tool (unsupported on android)"
+      continue
+    fi
     if check_installed "$tool"; then
       continue
     fi
